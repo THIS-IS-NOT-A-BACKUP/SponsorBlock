@@ -1,6 +1,6 @@
 import Config from "./config";
 
-import { SponsorTime, IncompleteSponsorTime, CategorySkipOption, VideoID, SponsorHideType, FetchResponse, VideoInfo, StorageChangesObject } from "./types";
+import { SponsorTime, CategorySkipOption, VideoID, SponsorHideType, FetchResponse, VideoInfo, StorageChangesObject, ChannelIDInfo, ChannelIDStatus } from "./types";
 
 import { ContentContainer } from "./types";
 import Utils from "./utils";
@@ -29,7 +29,7 @@ const skipNotices: SkipNotice[] = [];
 // JSON video info 
 let videoInfo: VideoInfo = null;
 //the channel this video is about
-let channelID: string;
+let channelIDInfo: ChannelIDInfo;
 
 // Skips are scheduled to ensure precision.
 // Skips are rescheduled every seeking event.
@@ -84,9 +84,6 @@ utils.wait(() => Config.config !== null, 1000, 1).then(() => videoIDChange(getYo
 //this only happens if there is an error
 let sponsorLookupRetries = 0;
 
-/** Currently timed segment, which will be added to the unsubmitted segments when ready. */
-let currentlyTimedSegment: IncompleteSponsorTime | null = null;
-
 /** Segments created by the user which have not yet been submitted. */
 let sponsorTimesSubmitting: SponsorTime[] = [];
 
@@ -136,7 +133,7 @@ function messageListener(request: Message, sender: unknown, sendResponse: (respo
             startOrEndTimingNewSegment()
 
             sendResponse({
-                creatingSegment: currentlyTimedSegment !== null,
+                creatingSegment: isSegmentCreationInProgress(),
             });
 
             break;
@@ -157,13 +154,13 @@ function messageListener(request: Message, sender: unknown, sendResponse: (respo
         case "getVideoID":
             sendResponse({
                 videoID: sponsorVideoID,
-                creatingSegment: currentlyTimedSegment !== null,
+                creatingSegment: isSegmentCreationInProgress(),
             });
 
             break;
         case "getChannelID":
             sendResponse({
-                channelID: channelID
+                channelID: channelIDInfo.id
             });
 
             break;
@@ -215,7 +212,10 @@ function resetValues() {
 
     videoInfo = null;
     channelWhitelisted = false;
-    channelID = null;
+    channelIDInfo = {
+        status: ChannelIDStatus.Fetching,
+        id: null
+    };
 
     //empty the preview bar
     if (previewBar !== null) {
@@ -305,7 +305,6 @@ async function videoIDChange(id) {
 
     // Clear unsubmitted segments from the previous video
     sponsorTimesSubmitting = [];
-    currentlyTimedSegment = null;
     updateSponsorTimesSubmitting();
 }
 
@@ -396,7 +395,7 @@ function startSponsorSchedule(includeIntersectingSegments = false, currentTime?:
 
     if (video.paused) return;
 
-    if (Config.config.disableSkipping || channelWhitelisted || (channelID === null && Config.config.forceChannelCheck)){
+    if (Config.config.disableSkipping || channelWhitelisted || (channelIDInfo.status === ChannelIDStatus.Fetching && Config.config.forceChannelCheck)){
         return;
     }
 
@@ -707,21 +706,6 @@ async function getVideoInfo(): Promise<void> {
     }
 }
 
-async function videoInfoFetchFailed(errorMessage: string): Promise<void> {
-    console.log("failed\t" + errorMessage)
-    if (utils.isFirefox() && !Config.config.ytInfoPermissionGranted) {
-        // Attempt to ask permission for youtube.com domain
-        alert(chrome.i18n.getMessage("youtubePermissionRequest"));
-        
-        chrome.runtime.sendMessage({
-            message: "openPage",
-            url: "permissions/index.html#youtube.com"
-        });
-    } else {
-        alert(chrome.i18n.getMessage("videoInfoFetchFailed") + "\n\n" + chrome.i18n.getMessage(errorMessage));
-    }
-}
-
 function getYouTubeVideoID(url: string) {
     // For YouTube TV support
     if(url.startsWith("https://www.youtube.com/tv#/")) url = url.replace("#", "");
@@ -821,30 +805,20 @@ function updatePreviewBar(): void {
 async function whitelistCheck() {
     const whitelistedChannels = Config.config.whitelistedChannels;
 
-    const getChannelID = () => videoInfo?.videoDetails?.channelId 
-        ?? document.querySelector(".ytd-channel-name a")?.getAttribute("href")?.replace(/\/.+\//, "") // YouTube
+    const channelID = document.querySelector(".ytd-channel-name a")?.getAttribute("href")?.replace(/\/.+\//, "") // YouTube
         ?? document.querySelector(".ytp-title-channel-logo")?.getAttribute("href")?.replace(/https:\/.+\//, "") // YouTube Embed
         ?? document.querySelector("a > .channel-profile")?.parentElement?.getAttribute("href")?.replace(/\/.+\//, ""); // Invidious
 
-    try {
-        await utils.wait(() => !!getChannelID(), 6000, 20);
-    } catch {
-        if (Config.config.forceChannelCheck) {
-            // treat as not whitelisted
-            channelID = "";
-
-            // Don't warn for Invidious embeds
-            if (!(onInvidious && document.URL.includes("/embed/"))) {
-                videoInfoFetchFailed("adblockerIssueWhitelist");
-            }
+    if (channelID) {
+        channelIDInfo = {
+            status: ChannelIDStatus.Found,
+            id: channelID
         }
-
-        return;
-    }
-
-    channelID = getChannelID();
-    if (!channelID) {
-        channelID = null;
+    } else {
+        channelIDInfo = {
+            status: ChannelIDStatus.Failed,
+            id: null
+        }
 
         return;
     }
@@ -855,7 +829,7 @@ async function whitelistCheck() {
     }
 
     // check if the start of segments were missed
-    if (Config.config.forceChannelCheck && sponsorTimes && sponsorTimes.length > 0) startSkipScheduleCheckingForStartSponsors();
+    if (Config.config.forceChannelCheck && sponsorTimes?.length > 0) startSkipScheduleCheckingForStartSponsors();
 }
 
 /**
@@ -1107,11 +1081,11 @@ async function createButtons(): Promise<void> {
     controls = await utils.wait(getControls).catch();
 
     // Add button if does not already exist in html
-    createButton("startSponsor", "sponsorStart", () => closeInfoMenuAnd(() => startOrEndTimingNewSegment()), "PlayerStartIconSponsorBlocker256px.png");
-    createButton("cancelSponsor", "sponsorCancel", () => closeInfoMenuAnd(() => cancelCreatingSegment()), "PlayerUploadFailedIconSponsorBlocker256px.png");
-    createButton("info", "openPopup", openInfoMenu, "PlayerInfoIconSponsorBlocker256px.png");
-    createButton("delete", "clearTimes", () => closeInfoMenuAnd(() => clearSponsorTimes()), "PlayerDeleteIconSponsorBlocker256px.png");
-    createButton("submit", "SubmitTimes", submitSponsorTimes, "PlayerUploadIconSponsorBlocker256px.png");
+    createButton("startSponsor", "sponsorStart", () => closeInfoMenuAnd(() => startOrEndTimingNewSegment()), "PlayerStartIconSponsorBlocker.svg");
+    createButton("cancelSponsor", "sponsorCancel", () => closeInfoMenuAnd(() => cancelCreatingSegment()), "PlayerCancelSegmentIconSponsorBlocker.svg");
+    createButton("info", "openPopup", openInfoMenu, "PlayerInfoIconSponsorBlocker.svg");
+    createButton("delete", "clearTimes", () => closeInfoMenuAnd(() => clearSponsorTimes()), "PlayerDeleteIconSponsorBlocker.svg");
+    createButton("submit", "SubmitTimes", submitSponsorTimes, "PlayerUploadIconSponsorBlocker.svg");
 }
 
 /** Creates any missing buttons on the player and updates their visiblity. */
@@ -1144,13 +1118,13 @@ function updateEditButtonsOnPlayer(): void {
 
     // Only check if buttons should be visible if they're enabled
     if (buttonsEnabled) {
-        creatingSegment = currentlyTimedSegment !== null;
+        creatingSegment = isSegmentCreationInProgress();
 
         // Show only if there are any segments to submit
-        submitButtonVisible = sponsorTimesSubmitting.length > 0;
+        submitButtonVisible = sponsorTimesSubmitting.length > 1 || (sponsorTimesSubmitting.length > 0 && !creatingSegment);
 
         // Show only if there are any segments to delete
-        deleteButtonVisible = sponsorTimesSubmitting.length > 0;
+        deleteButtonVisible = sponsorTimesSubmitting.length > 1 || (sponsorTimesSubmitting.length > 0 && !creatingSegment);
     }
 
     // Update the elements
@@ -1159,10 +1133,10 @@ function updateEditButtonsOnPlayer(): void {
 
     if (buttonsEnabled) {
         if (creatingSegment) {
-            playerButtons.startSponsor.image.src = chrome.extension.getURL("icons/PlayerStopIconSponsorBlocker256px.png");
+            playerButtons.startSponsor.image.src = chrome.extension.getURL("icons/PlayerStopIconSponsorBlocker.svg");
             playerButtons.startSponsor.button.setAttribute("title", chrome.i18n.getMessage("sponsorEnd"));
         } else {
-            playerButtons.startSponsor.image.src = chrome.extension.getURL("icons/PlayerStartIconSponsorBlocker256px.png");
+            playerButtons.startSponsor.image.src = chrome.extension.getURL("icons/PlayerStartIconSponsorBlocker.svg");
             playerButtons.startSponsor.button.setAttribute("title", chrome.i18n.getMessage("sponsorStart"));
         }
     }
@@ -1190,39 +1164,49 @@ function getRealCurrentTime(): number {
 }
 
 function startOrEndTimingNewSegment() {
-    if (!currentlyTimedSegment) {
-        // Start a new segment
-        currentlyTimedSegment = {
+    if (!isSegmentCreationInProgress()) {
+        sponsorTimesSubmitting.push({
             segment: [getRealCurrentTime()],
             UUID: null,
             category: Config.config.defaultCategory,
-        };
+        });
     } else {
         // Finish creating the new segment
-        const existingTime = currentlyTimedSegment.segment[0];
+        const existingSegment = getIncompleteSegment();
+        const existingTime = existingSegment.segment[0];
         const currentTime = getRealCurrentTime();
-
-        sponsorTimesSubmitting.push({
-            ...currentlyTimedSegment,
-            // Swap timestamps if the user put the segment end before the start
-            segment: [Math.min(existingTime, currentTime), Math.max(existingTime, currentTime)],
-        });
-
-        currentlyTimedSegment = null;
-
-        // Save the newly created segment
-        Config.config.segmentTimes.set(sponsorVideoID, sponsorTimesSubmitting);
+            
+        // Swap timestamps if the user put the segment end before the start
+        existingSegment.segment = [Math.min(existingTime, currentTime), Math.max(existingTime, currentTime)];
     }
 
-    updateEditButtonsOnPlayer();
+    // Save the newly created segment
+    Config.config.segmentTimes.set(sponsorVideoID, sponsorTimesSubmitting);
 
+    updateEditButtonsOnPlayer();
     updateSponsorTimesSubmitting(false);
 }
 
+function getIncompleteSegment(): SponsorTime {
+    return sponsorTimesSubmitting[sponsorTimesSubmitting.length - 1];
+}
+
+/** Is the latest submitting segment incomplete */
+function isSegmentCreationInProgress(): boolean {
+    const segment = getIncompleteSegment();
+    return segment && segment?.segment?.length !== 2;
+}
+
 function cancelCreatingSegment() {
-    currentlyTimedSegment = null;
+    if (isSegmentCreationInProgress()) {
+        sponsorTimesSubmitting.splice(sponsorTimesSubmitting.length - 1, 1);
+        Config.config.segmentTimes.set(sponsorVideoID, sponsorTimesSubmitting);
+
+        if (sponsorTimesSubmitting.length <= 0) resetSponsorSubmissionNotice();
+    }
 
     updateEditButtonsOnPlayer();
+    updateSponsorTimesSubmitting(false);
 }
 
 function updateSponsorTimesSubmitting(getFromConfig = true) {
@@ -1353,6 +1337,8 @@ function clearSponsorTimes() {
                                 + "\n" + chrome.i18n.getMessage("confirmMSG")
         if(!confirm(confirmMessage)) return;
 
+        resetSponsorSubmissionNotice();
+
         //clear the sponsor times
         Config.config.segmentTimes.delete(currentVideoID);
 
@@ -1360,7 +1346,6 @@ function clearSponsorTimes() {
         sponsorTimesSubmitting = [];
 
         updatePreviewBar();
-
         updateEditButtonsOnPlayer();
     }
 }
@@ -1431,6 +1416,7 @@ function dontShowNoticeAgain() {
  * Helper method for the submission notice to clear itself when it closes
  */
 function resetSponsorSubmissionNotice() {
+    submissionNotice?.close();
     submissionNotice = null;
 }
 
@@ -1447,7 +1433,7 @@ function submitSponsorTimes() {
 //called after all the checks have been made that it's okay to do so
 async function sendSubmitMessage() {
     // Add loading animation
-    playerButtons.submit.image.src = chrome.extension.getURL("icons/PlayerUploadIconSponsorBlocker256px.png");
+    playerButtons.submit.image.src = chrome.extension.getURL("icons/PlayerUploadIconSponsorBlocker.svg");
     playerButtons.submit.button.style.animation = "rotate 1s 0s infinite";
 
     //check if a sponsor exceeds the duration of the video
@@ -1500,7 +1486,6 @@ async function sendSubmitMessage() {
         Config.config.segmentTimes.delete(sponsorVideoID);
 
         // Add submissions to current sponsors list
-        // FIXME: segments from sponsorTimesSubmitting do not contain UUIDs .-.
         sponsorTimes = (sponsorTimes || []).concat(sponsorTimesSubmitting);
 
         // Increase contribution count
@@ -1511,14 +1496,13 @@ async function sendSubmitMessage() {
         Config.config.submissionCountSinceCategories = Config.config.submissionCountSinceCategories + 1;
 
         // Empty the submitting times
-        currentlyTimedSegment = null;
         sponsorTimesSubmitting = [];
 
         updatePreviewBar();
     } else {
         // Show that the upload failed
         playerButtons.submit.button.style.animation = "unset";
-        playerButtons.submit.image.src = chrome.extension.getURL("icons/PlayerUploadFailedIconSponsorBlocker256px.png");
+        playerButtons.submit.image.src = chrome.extension.getURL("icons/PlayerUploadFailedIconSponsorBlocker.svg");
 
         alert(utils.getErrorMessage(response.status, response.responseText));
     }

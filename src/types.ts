@@ -52,17 +52,13 @@ export enum SponsorHideType {
 }
 
 export interface SponsorTime {
-    segment: number[];
+    segment: [number] | [number, number];
     UUID: string;
 
     category: string;
 
     hidden?: SponsorHideType;
 }
-
-export type IncompleteSponsorTime = Omit<SponsorTime, 'segment'> & {
-    segment: [number];
-};
 
 export interface PreviewBarOption {
     color: string,
@@ -165,3 +161,14 @@ export type VideoID = string;
 export type StorageChangesObject = { [key: string]: chrome.storage.StorageChange };
 
 export type UnEncodedSegmentTimes = [string, SponsorTime[]][];
+
+export enum ChannelIDStatus {
+    Fetching,
+    Found,
+    Failed
+}
+
+export interface ChannelIDInfo {
+    id: string,
+    status: ChannelIDStatus
+}
