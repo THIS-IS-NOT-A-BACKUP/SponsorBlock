@@ -568,22 +568,12 @@ async function sponsorsLookup(id: string) {
         categories
     }).then(async (response: FetchResponse) => {
         if (response?.ok) {
-            let result = JSON.parse(response.responseText);
-            result = result.filter((video) => video.videoID === id);
-            if (result.length > 0) {
-                result = result[0].segments;
-                if (result.length === 0) { // return if no segments found
-                    retryFetch(id);
-                    return;
-                }
-            } else { // return if no video found
-                retryFetch(id);
-                return;
-            }
-
-            const recievedSegments: SponsorTime[] = result;
-            if (!recievedSegments.length) {
-                console.error("[SponsorBlock] Server returned malformed response: " + JSON.stringify(recievedSegments));
+            const recievedSegments: SponsorTime[] = JSON.parse(response.responseText)
+                        ?.filter((video) => video.videoID === id)
+                        ?.map((video) => video.segments)[0];
+            if (!recievedSegments || !recievedSegments.length) { 
+                // return if no video found
+                retryFetch();
                 return;
             }
 
@@ -599,6 +589,7 @@ async function sponsorsLookup(id: string) {
                 }
             }
 
+            const oldSegments = sponsorTimes;
             sponsorTimes = recievedSegments;
 
             // Hide all submissions smaller than the minimum duration
@@ -607,6 +598,15 @@ async function sponsorsLookup(id: string) {
                     if (sponsorTimes[i].segment[1] - sponsorTimes[i].segment[0] < Config.config.minDuration) {
                         sponsorTimes[i].hidden = SponsorHideType.MinimumDuration;
                     }
+                }
+            }
+
+            for (const segment of oldSegments) {
+                const otherSegment = sponsorTimes.find((other) => segment.UUID === other.UUID);
+                if (otherSegment) {
+                    // If they downvoted it, or changed the category, keep it
+                    otherSegment.hidden = segment.hidden;
+                    otherSegment.category = segment.category;
                 }
             }
 
@@ -625,20 +625,24 @@ async function sponsorsLookup(id: string) {
 
             sponsorLookupRetries = 0;
         } else if (response?.status === 404) {
-            retryFetch(id);
+            retryFetch();
         } else if (sponsorLookupRetries < 15 && !recheckStarted) {
             recheckStarted = true;
 
             //TODO lower when server becomes better (back to 1 second)
             //some error occurred, try again in a second
-            setTimeout(() => sponsorsLookup(id), 5000 + Math.random() * 15000 + 5000 * sponsorLookupRetries);
+            setTimeout(() => {
+                if (sponsorVideoID && sponsorTimes?.length === 0) {
+                    sponsorsLookup(sponsorVideoID);
+                }
+            }, 5000 + Math.random() * 15000 + 5000 * sponsorLookupRetries);
 
             sponsorLookupRetries++;
         }
     });
 }
 
-function retryFetch(id: string): void {
+function retryFetch(): void {
     if (!Config.config.refetchWhenNotFound) return;
 
     sponsorDataFound = false;
@@ -649,7 +653,11 @@ function retryFetch(id: string): void {
 
         //if less than 3 days old
         if (Date.now() - new Date(dateUploaded).getTime() < 259200000) {
-            setTimeout(() => sponsorsLookup(id), 30000 + Math.random() * 90000);
+            setTimeout(() => {
+                if (sponsorVideoID && sponsorTimes?.length === 0) {
+                    sponsorsLookup(sponsorVideoID);
+                }
+            }, 10000 + Math.random() * 30000);
         }
     });
 
@@ -1182,6 +1190,9 @@ function startOrEndTimingNewSegment() {
 
     // Save the newly created segment
     Config.config.segmentTimes.set(sponsorVideoID, sponsorTimesSubmitting);
+
+    // Make sure they know if someone has already submitted something it while they were watching
+    sponsorsLookup(sponsorVideoID);
 
     updateEditButtonsOnPlayer();
     updateSponsorTimesSubmitting(false);
