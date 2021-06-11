@@ -44,7 +44,6 @@ let video: HTMLVideoElement;
 let videoMutationObserver: MutationObserver = null;
 // List of videos that have had event listeners added to them
 const videosWithEventListeners: HTMLVideoElement[] = [];
-const videoRootsWithEventListeners: HTMLDivElement[] = [];
 
 let onInvidious;
 let onMobileYouTube;
@@ -77,6 +76,7 @@ const playerButtons: Record<string, {button: HTMLButtonElement, image: HTMLImage
 
 // Direct Links after the config is loaded
 utils.wait(() => Config.config !== null, 1000, 1).then(() => videoIDChange(getYouTubeVideoID(document.URL)));
+addHotkeyListener();
 
 //the amount of times the sponsor lookup has retried
 //this only happens if there is an error
@@ -493,7 +493,6 @@ function refreshVideoAttachments() {
     if (newVideo && newVideo !== video) {
         video = newVideo;
 
-        addHotkeyListener();
         if (!videosWithEventListeners.includes(video)) {
             videosWithEventListeners.push(video);
 
@@ -722,7 +721,7 @@ function startSkipScheduleCheckingForStartSponsors() {
  * Get the video info for the current tab from YouTube
  */
 async function getVideoInfo(): Promise<void> {
-    const result = await utils.asyncRequestToCustomServer("GET", "https://www.youtube.com/get_video_info?video_id=" + sponsorVideoID);
+    const result = await utils.asyncRequestToCustomServer("GET", "https://www.youtube.com/get_video_info?video_id=" + sponsorVideoID + "&html5=1");
 
     if (result.ok) {
         const decodedData = decodeURIComponent(result.responseText).match(/player_response=([^&]*)/)[1];
@@ -835,16 +834,19 @@ function updatePreviewBar(): void {
 async function whitelistCheck() {
     const whitelistedChannels = Config.config.whitelistedChannels;
 
-    const channelID = document.querySelector(".ytd-channel-name a")?.getAttribute("href")?.replace(/\/.+\//, "") // YouTube
+    const getChannelID = () => videoInfo?.videoDetails?.channelId
+        ?? document.querySelector(".ytd-channel-name a")?.getAttribute("href")?.replace(/\/.+\//, "") // YouTube
         ?? document.querySelector(".ytp-title-channel-logo")?.getAttribute("href")?.replace(/https:\/.+\//, "") // YouTube Embed
         ?? document.querySelector("a > .channel-profile")?.parentElement?.getAttribute("href")?.replace(/\/.+\//, ""); // Invidious
 
-    if (channelID) {
+    try {
+        await utils.wait(() => !!getChannelID(), 6000, 20);
+
         channelIDInfo = {
             status: ChannelIDStatus.Found,
-            id: channelID
+            id: getChannelID()
         }
-    } else {
+    } catch (e) {
         channelIDInfo = {
             status: ChannelIDStatus.Failed,
             id: null
@@ -854,7 +856,7 @@ async function whitelistCheck() {
     }
 
     //see if this is a whitelisted channel
-    if (whitelistedChannels != undefined && whitelistedChannels.includes(channelID)) {
+    if (whitelistedChannels != undefined && whitelistedChannels.includes(getChannelID())) {
         channelWhitelisted = true;
     }
 
@@ -1563,21 +1565,14 @@ function getSegmentsMessage(sponsorTimes: SponsorTime[]): string {
     return sponsorTimesMessage;
 }
 
-function addHotkeyListener(): boolean {
-    let videoRoot = document.getElementById("movie_player") as HTMLDivElement;
-    if (onInvidious) videoRoot = (document.getElementById("player-container") ?? document.getElementById("player")) as HTMLDivElement;
-    if (video.baseURI.startsWith("https://www.youtube.com/tv#/")) videoRoot = document.querySelector("ytlr-watch-page") as HTMLDivElement;
-
-    if (videoRoot && !videoRootsWithEventListeners.includes(videoRoot)) {
-        videoRoot.addEventListener("keydown", hotkeyListener);
-        videoRootsWithEventListeners.push(videoRoot);
-        return true;
-    }
-
-    return false;
+function addHotkeyListener(): void {
+    document.addEventListener("keydown", hotkeyListener);
 }
 
 function hotkeyListener(e: KeyboardEvent): void {
+    if (["textarea", "input"].includes(document.activeElement?.tagName?.toLowerCase())
+        || document.activeElement?.id?.toLowerCase()?.includes("editable")) return;
+
     const key = e.key;
 
     const skipKey = Config.config.skipKeybind;
