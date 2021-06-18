@@ -47,14 +47,16 @@ interface SBConfig {
         "preview-chooseACategory": PreviewBarOption,
         "sponsor": PreviewBarOption,
         "preview-sponsor": PreviewBarOption,
+        "selfpromo": PreviewBarOption,
+        "preview-selfpromo": PreviewBarOption,
+        "interaction": PreviewBarOption,
+        "preview-interaction": PreviewBarOption,
         "intro": PreviewBarOption,
         "preview-intro": PreviewBarOption,
         "outro": PreviewBarOption,
         "preview-outro": PreviewBarOption,
-        "interaction": PreviewBarOption,
-        "preview-interaction": PreviewBarOption,
-        "selfpromo": PreviewBarOption,
-        "preview-selfpromo": PreviewBarOption,
+        "preview": PreviewBarOption,
+        "preview-preview": PreviewBarOption,
         "music_offtopic": PreviewBarOption,
         "preview-music_offtopic": PreviewBarOption,
     }
@@ -192,6 +194,22 @@ const Config: SBObject = {
                 color: "#007800",
                 opacity: "0.7"
             },
+            "selfpromo": {
+                color: "#ffff00",
+                opacity: "0.7"
+            },
+            "preview-selfpromo": {
+                color: "#bfbf35",
+                opacity: "0.7"
+            },
+            "interaction": {
+                color: "#cc00ff",
+                opacity: "0.7"
+            },
+            "preview-interaction": {
+                color: "#6c0087",
+                opacity: "0.7"
+            },
             "intro": {
                 color: "#00ffff",
                 opacity: "0.7"
@@ -208,20 +226,12 @@ const Config: SBObject = {
                 color: "#000070",
                 opacity: "0.7"
             },
-            "interaction": {
-                color: "#cc00ff",
+            "preview": {
+                color: "#0b9d65",
                 opacity: "0.7"
             },
-            "preview-interaction": {
-                color: "#6c0087",
-                opacity: "0.7"
-            },
-            "selfpromo": {
-                color: "#ffff00",
-                opacity: "0.7"
-            },
-            "preview-selfpromo": {
-                color: "#bfbf35",
+            "preview-preview": {
+                color: "#065b3a",
                 opacity: "0.7"
             },
             "music_offtopic": {
@@ -327,6 +337,25 @@ function fetchConfig(): Promise<void> {
 }
 
 function migrateOldFormats(config: SBConfig) {
+    // Adding preview category
+    if (!config["previewCategoryUpdate"]) {
+        config["previewCategoryUpdate"] = true;
+        for (const selection of config.categorySelections) {
+            if (selection.name === "intro" 
+                    && selection.option === CategorySkipOption.AutoSkip ||  selection.option === CategorySkipOption.ManualSkip) {
+                
+                // Add a default skip option for preview category
+                config.categorySelections.push({
+                    name: "preview",
+                    option: CategorySkipOption.ManualSkip
+                });
+                // Ensure it gets updated
+                config.categorySelections = config.categorySelections;
+                break;
+            }
+        }
+    }
+
     if (config["disableAutoSkip"]) {
         for (const selection of config.categorySelections) {
             if (selection.name === "sponsor") {
