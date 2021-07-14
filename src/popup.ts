@@ -431,7 +431,11 @@ async function runThePopup(messageListener?: MessageListener): Promise<void> {
                 uuidButton.id = "sponsorTimesCopyUUIDButtonContainer" + UUID;
                 uuidButton.className = "voteButton";
                 uuidButton.src = chrome.extension.getURL("icons/clipboard.svg");
-                uuidButton.addEventListener("click", () => navigator.clipboard.writeText(UUID));
+                uuidButton.addEventListener("click", () => {
+                    navigator.clipboard.writeText(UUID);
+                    const stopAnimation = utils.applyLoadingAnimation(uuidButton, 0.3);
+                    stopAnimation();
+                });
 
                 //add thumbs up, thumbs down and uuid copy buttons to the container
                 voteButtonsContainer.appendChild(upvoteButton);
@@ -679,13 +683,16 @@ async function runThePopup(messageListener?: MessageListener): Promise<void> {
     }
 
     function refreshSegments() {
+        const stopAnimation = utils.applyLoadingAnimation(PageElements.refreshSegmentsButton, 0.3);
+
         messageHandler.query({
             active: true,
             currentWindow: true
         }, tabs => {
             messageHandler.sendMessage(
                 tabs[0].id,
-                {message: 'refreshSegments'}
+                {message: 'refreshSegments'},
+                () => stopAnimation()
             )}
         );
     }
