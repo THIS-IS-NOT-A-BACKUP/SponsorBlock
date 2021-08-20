@@ -1,5 +1,5 @@
 import * as CompileConfig from "../config.json";
-import { Category, CategorySelection, CategorySkipOption, PreviewBarOption, SponsorTime, StorageChangesObject, UnEncodedSegmentTimes as UnencodedSegmentTimes } from "./types";
+import { Category, CategorySelection, CategorySkipOption, NoticeVisbilityMode, PreviewBarOption, SponsorTime, StorageChangesObject, UnEncodedSegmentTimes as UnencodedSegmentTimes } from "./types";
 
 interface SBConfig {
     userID: string,
@@ -20,6 +20,7 @@ interface SBConfig {
     trackViewCount: boolean,
     trackViewCountInPrivate: boolean,
     dontShowNotice: boolean,
+    noticeVisibilityMode: NoticeVisbilityMode,
     hideVideoPlayerControls: boolean,
     hideInfoButtonPlayerControls: boolean,
     hideDeleteButtonPlayerControls: boolean,
@@ -37,8 +38,10 @@ interface SBConfig {
     refetchWhenNotFound: boolean,
     ytInfoPermissionGranted: boolean,
     allowExpirements: boolean,
+    showDonationLink: boolean,
     autoHideInfoButton: boolean,
     autoSkipOnMusicVideos: boolean,
+    highlightCategoryUpdate: boolean
 
     // What categories should be skipped
     categorySelections: CategorySelection[],
@@ -162,6 +165,7 @@ const Config: SBObject = {
         trackViewCount: true,
         trackViewCountInPrivate: true,
         dontShowNotice: false,
+        noticeVisibilityMode: NoticeVisbilityMode.FadedForAutoSkip,
         hideVideoPlayerControls: false,
         hideInfoButtonPlayerControls: false,
         hideDeleteButtonPlayerControls: false,
@@ -179,8 +183,10 @@ const Config: SBObject = {
         refetchWhenNotFound: true,
         ytInfoPermissionGranted: false,
         allowExpirements: true,
+        showDonationLink: true,
         autoHideInfoButton: true,
         autoSkipOnMusicVideos: false,
+        highlightCategoryUpdate: false, // TODO: Remove this once update is done
 
         categorySelections: [{
             name: "sponsor" as Category,
