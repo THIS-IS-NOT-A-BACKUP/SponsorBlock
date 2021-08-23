@@ -961,14 +961,14 @@ function getNextSkipIndex(currentTime: number, includeIntersectingSegments: bool
     if ((minUnsubmittedSponsorTimeIndex === -1 && minSponsorTimeIndex !== -1) || 
             sponsorStartTimes[minSponsorTimeIndex] < unsubmittedSponsorStartTimes[minUnsubmittedSponsorTimeIndex]) {
         return {
-            array: sponsorTimes,
+            array: sponsorTimes.filter((segment) => getCategoryActionType(segment.category) === CategoryActionType.Skippable),
             index: minSponsorTimeIndex,
             endIndex: endTimeIndex,
             openNotice: true
         };
     } else {
         return {
-            array: sponsorTimesSubmitting,
+            array: sponsorTimesSubmitting.filter((segment) => getCategoryActionType(segment.category) === CategoryActionType.Skippable),
             index: minUnsubmittedSponsorTimeIndex,
             endIndex: previewEndTimeIndex,
             openNotice: false
@@ -1189,7 +1189,8 @@ function createButton(baseID: string, title: string, callback: () => void, image
 
 function shouldAutoSkip(segment: SponsorTime): boolean {
     return utils.getCategorySelection(segment.category)?.option === CategorySkipOption.AutoSkip ||
-            (Config.config.autoSkipOnMusicVideos && sponsorTimes.some((s) => s.category === "music_offtopic"));
+            (Config.config.autoSkipOnMusicVideos && sponsorTimes.some((s) => s.category === "music_offtopic")
+                && getCategoryActionType(segment.category) === CategoryActionType.Skippable);
 }
 
 function shouldSkip(segment: SponsorTime): boolean {
