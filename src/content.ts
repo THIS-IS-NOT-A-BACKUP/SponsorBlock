@@ -1085,6 +1085,8 @@ function sendTelemetryAndCount(skippingSegments: SponsorTime[], secondsSkipped: 
 
 //skip from the start time to the end time for a certain index sponsor time
 function skipToTime({v, skipTime, skippingSegments, openNotice, forceAutoSkip, unskipTime}: SkipToTimeParams): void {
+    if (Config.config.disableSkipping) return;
+
     // There will only be one submission if it is manual skip
     const autoSkip: boolean = forceAutoSkip || shouldAutoSkip(skippingSegments[0]);
 
@@ -1457,11 +1459,13 @@ function openInfoMenu() {
             const logo = <HTMLImageElement> popup.querySelector("#sponsorBlockPopupLogo");
             const settings = <HTMLImageElement> popup.querySelector("#sbPopupIconSettings");
             const edit = <HTMLImageElement> popup.querySelector("#sbPopupIconEdit");
+            const copy = <HTMLImageElement> popup.querySelector("#sbPopupIconCopyUserID");
             const check = <HTMLImageElement> popup.querySelector("#sbPopupIconCheck");
             const refreshSegments = <HTMLImageElement> popup.querySelector("#refreshSegments");
             logo.src = chrome.extension.getURL("icons/IconSponsorBlocker256px.png");
             settings.src = chrome.extension.getURL("icons/settings.svg");
             edit.src = chrome.extension.getURL("icons/pencil.svg");
+            copy.src = chrome.extension.getURL("icons/clipboard.svg");
             check.src = chrome.extension.getURL("icons/check.svg");
             refreshSegments.src = chrome.extension.getURL("icons/refresh.svg");
 
