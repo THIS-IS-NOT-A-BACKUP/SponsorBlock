@@ -362,9 +362,6 @@
     "changeUserID": {
         "message": "Importar/Exportar seu ID de usuário"
     },
-    "whatChangeUserID": {
-        "message": "Isso deve ser mantido em segredo. É como se fosse uma senha e não deve ser compartilhado com ninguém. Se alguém tiver isso, poderá se passar por você."
-    },
     "setUserID": {
         "message": "Definir ID de usuário"
     },
@@ -723,7 +720,7 @@
         "message": "Ocultar para sempre"
     },
     "warningChatInfo": {
-        "message": "Você recebeu um aviso e temporariamente não poderá enviar segmentos. Isso significa que notamos que você cometeu alguns erros comuns que não são maliciosos, e queremos apenas clarificar as regras. Você também pode participar desse chat usando discord.gg/SponsorBlock ou matrix.to/#/+sponsor:ajay.app"
+        "message": "Você recebeu um aviso e temporariamente não poderá enviar segmentos. Isso significa que notamos que você cometeu alguns erros comuns que não são maliciosos, e queremos apenas clarificar as regras. Você também pode participar desse chat usando discord.gg/SponsorBlock ou matrix.to/#/#sponsor:ajay.app"
     },
     "voteRejectedWarning": {
         "message": "Voto rejeitado devido a um aviso. Clique para abrir um chat para resolvê-lo, ou volte mais tarde quando tiver tempo.",

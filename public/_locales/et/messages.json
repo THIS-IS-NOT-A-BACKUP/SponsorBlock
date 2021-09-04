@@ -52,6 +52,9 @@
     "reskip": {
         "message": "Jäta uuesti vahele"
     },
+    "unmute": {
+        "message": "Tühista vaigistus"
+    },
     "paused": {
         "message": "Pausil"
     },
@@ -302,6 +305,9 @@
     "skip": {
         "message": "Jäta vahele"
     },
+    "mute": {
+        "message": "Vaigista"
+    },
     "skip_category": {
         "message": "Jätad {0} vahele?"
     },
@@ -366,7 +372,7 @@
         "message": "Impordi/ekspordi oma UserID"
     },
     "whatChangeUserID": {
-        "message": "Seda tuleks privaatsena hoida. See on nagu parool ning seda ei tohiks kellegagi jagada. Kui kellelgi see on, saavad nad sinuna esineda."
+        "message": "Seda tuleks privaatsena hoida. See on nagu parool ning seda ei tohiks kellegagi jagada. Kui kellelgi see on, saavad nad sinuna esineda.\nKui otsid avalikku UserID'd, klõpsa hüpikus olevat lõikelaua ikooni."
     },
     "setUserID": {
         "message": "Seadista UserID"
@@ -604,6 +610,9 @@
     "autoSkipOnMusicVideos": {
         "message": "Jäta automaatselt kõik segmendid vahele, kui eksisteerib mitte-muusika segment"
     },
+    "muteSegments": {
+        "message": "Luba segmente, mis vahelejätmise asemel vaigistavad heli"
+    },
     "colorFormatIncorrect": {
         "message": "Sinu värv on sobimatult vormistatud. See peaks olema 3- või 6-numbriline 16-kümmendsüsteemis kood, arvu ees trellid."
     },
@@ -726,7 +735,7 @@
         "message": "Peida igaveseks"
     },
     "warningChatInfo": {
-        "message": "Sa said hoiatuse ning ei saa ajutiselt segmente saata. See tähendab, et me leidsime sind tegemast teatud sagedasi, mitte-pahatahtlikke vigu, ning soovime sulle meie reegleid täpsustada (inglise keeles). Sa võid selle vestlusega liituda ka discord.gg/SponsorBlock või matrix.to/#/+sponsor:ajay.app kaudu."
+        "message": "Sa said hoiatuse ning ei saa ajutiselt segmente saata. See tähendab, et me leidsime sind tegemast teatud sagedasi, mitte-pahatahtlikke vigu, ning soovime sulle meie reegleid täpsustada (inglise keeles). Sa võid selle vestlusega liituda ka discord.gg/SponsorBlock või matrix.to/#/#sponsor:ajay.app kaudu."
     },
     "voteRejectedWarning": {
         "message": "Hääletus hoiatuse tõttu tagasilükatud. Klõpsa, et avada selle lahendamiseks vestlus või tule hiljem tagasi, kui aega saad.",

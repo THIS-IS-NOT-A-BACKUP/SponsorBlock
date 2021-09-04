@@ -103,9 +103,6 @@
     "connectionError": {
         "message": "A connection error has occured. Error code: "
     },
-    "wantToSubmit": {
-        "message": "Do you want to submit for video id"
-    },
     "clearTimes": {
         "message": "Clear Segments"
     },
@@ -311,6 +308,9 @@
     "skip_category": {
         "message": "Skip {0}?"
     },
+    "mute_category": {
+        "message": "Mute {0}?"
+    },
     "skip_to_category": {
         "message": "Skip to {0}?",
         "description": "Used for skipping to things (Skip to Highlight)"
@@ -318,6 +318,10 @@
     "skipped": {
         "message": "{0} Skipped",
         "description": "Example: Sponsor Skipped"
+    },
+    "muted": {
+        "message": "{0} Muted",
+        "description": "Example: Sponsor Muted"
     },
     "skipped_to_category": {
         "message": "Skipped to {0}",
@@ -735,7 +739,7 @@
         "message": "Hide forever"
     },
     "warningChatInfo": {
-        "message": "You got a warning and cannot submit segments temporarily. This means that we noticed you were making some common mistakes that are not malicious, and we just want to clarify the rules. You can also join this chat using discord.gg/SponsorBlock or matrix.to/#/+sponsor:ajay.app"
+        "message": "You got a warning and cannot submit segments temporarily. This means that we noticed you were making some common mistakes that are not malicious, and we just want to clarify the rules. You can also join this chat using discord.gg/SponsorBlock or matrix.to/#/#sponsor:ajay.app"
     },
     "voteRejectedWarning": {
         "message": "Vote rejected due to a warning. Click to open a chat to resolve it, or come back later when you have time.",

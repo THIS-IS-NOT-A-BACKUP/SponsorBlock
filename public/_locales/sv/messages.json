@@ -52,6 +52,9 @@
     "reskip": {
         "message": "Hoppa över igen"
     },
+    "unmute": {
+        "message": "Ljud på"
+    },
     "paused": {
         "message": "Pausad"
     },
@@ -302,6 +305,9 @@
     "skip": {
         "message": "Hoppa över"
     },
+    "mute": {
+        "message": "Ljud av"
+    },
     "skip_category": {
         "message": "Hoppa över {0}?"
     },
@@ -366,7 +372,7 @@
         "message": "Importera/Exportera Ditt AnvändarID"
     },
     "whatChangeUserID": {
-        "message": "Denna ska hållas privat. Den fungerar som ett lösenord och ska inte delas med någon. Om någon får tag i den kan de utge sig för att vara dig."
+        "message": "Detta ska hållas privat. Detta är som ett lösenord och ska inte delas med någon. Om andra får tag i det kan de utge sig för att vara dig. Om du letar efter ditt offentliga Användar-ID kan du klicka på urklippsikonen i popupen."
     },
     "setUserID": {
         "message": "Ange AnvändarID"
@@ -604,6 +610,9 @@
     "autoSkipOnMusicVideos": {
         "message": "Hoppa över alla segment automatiskt när det finns ett icke-musiksegment"
     },
+    "muteSegments": {
+        "message": "Tillåt segment som tystar ljudet i stället för att hoppa över"
+    },
     "colorFormatIncorrect": {
         "message": "Din färg är felaktigt formaterad. Det ska vara en 3- eller 6-siffrig hex-kod med en siffra i början."
     },
@@ -726,7 +735,7 @@
         "message": "Dölj för alltid"
     },
     "warningChatInfo": {
-        "message": "Du har fått en tillfällig varning och kan inte skicka in segment. Detta innebär att vi har upptäckt att några vanliga misstag är gjorda som inte är uppsåtliga och vi vill bara klargöra reglerna. Du kan också gå med i den här chatten genom att använda discord.gg/SponsorBlock eller matrix.to/#/+sponsor:ajay.app"
+        "message": "Du har fått en tillfällig varning och kan inte skicka in segment. Detta innebär att vi har upptäckt att några vanliga misstag är gjorda som inte är uppsåtliga och vi vill bara klargöra reglerna. Du kan också gå med i den här chatten genom att använda discord.gg/SponsorBlock eller matrix.to/#/#sponsor:ajay.app"
     },
     "voteRejectedWarning": {
         "message": "Rösten avvisades på grund av en varning. Klicka för att öppna ett chattfönster för att lösa problemet eller kom tillbaka senare när du har tid.",
