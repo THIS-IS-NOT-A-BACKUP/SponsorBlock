@@ -16,6 +16,7 @@ import * as Chat from "./js-components/chat";
 import { getCategoryActionType } from "./utils/categoryUtils";
 import { SkipButtonControlBar } from "./js-components/skipButtonControlBar";
 import { Tooltip } from "./render/Tooltip";
+import { getStartTimeFromUrl } from "./utils/urlParser";
 
 // Hack to get the CSS loaded on permission-based sites (Invidious)
 utils.wait(() => Config.config !== null, 5000, 10).then(addCSS);
@@ -29,6 +30,7 @@ let sponsorVideoID: VideoID = null;
 // List of open skip notices
 const skipNotices: SkipNotice[] = [];
 let activeSkipKeybindElement: ToggleSkippable = null;
+let lastPOISkip = 0;
 
 // JSON video info 
 let videoInfo: VideoInfo = null;
@@ -387,11 +389,11 @@ function durationChangeListener(): void {
     updateAdFlag();
     updatePreviewBar();
 
-    sponsorTimes = sponsorTimes.filter(segmentDurationFilter);
+    if (sponsorTimes) sponsorTimes = sponsorTimes.filter(segmentDurationFilter);
 }
 
 function segmentDurationFilter(segment: SponsorTime): boolean {
-    return segment.videoDuration === 0 || video.duration === 0 || Math.abs(video.duration - segment.videoDuration) < 2;
+    return segment.videoDuration === 0 || !video?.duration || Math.abs(video.duration - segment.videoDuration) < 2;
 }
 
 function cancelSponsorSchedule(): void {
@@ -557,13 +559,17 @@ function setupVideoListeners() {
         switchingVideos = false;
 
         video.addEventListener('play', () => {
-            switchingVideos = false;
-    
             // If it is not the first event, then the only way to get to 0 is if there is a seek event
             // This check makes sure that changing the video resolution doesn't cause the extension to think it
             // gone back to the begining
             if (!firstEvent && video.currentTime === 0) return;
             firstEvent = false;
+
+            if (switchingVideos) {
+                switchingVideos = false;
+                // If already segments loaded before video, retry to skip starting segments
+                if (sponsorTimes) startSkipScheduleCheckingForStartSponsors();
+            }
     
             // Check if an ad is playing
             updateAdFlag();
@@ -602,7 +608,9 @@ function setupVideoListeners() {
                         getCategoryActionType(segment.category) === CategoryActionType.POI &&
                         video.currentTime - segment.segment[0] > 0 &&
                         video.currentTime - segment.segment[0] < previewBar.getMinimumSize(true));
-                if (currentPoiSegment && !skipNotices.some((notice) => notice.segments.some((s) => s.UUID === currentPoiSegment.UUID))) {
+                if (currentPoiSegment && lastPOISkip < Date.now() - 3000
+                        && !skipNotices.some((notice) => notice.segments.some((s) => s.UUID === currentPoiSegment.UUID))) {
+                    lastPOISkip = Date.now();
                     skipToTime({
                         v: video, 
                         skipTime: currentPoiSegment.segment, 
@@ -766,24 +774,27 @@ function retryFetch(): void {
  * Ex. When segments are first loaded
  */
 function startSkipScheduleCheckingForStartSponsors() {
-    if (!switchingVideos) {
+    if (!switchingVideos && sponsorTimes) {
         // See if there are any starting sponsors
-        let startingSegmentTime = -1;
+        let startingSegmentTime = getStartTimeFromUrl(document.URL) || -1;
+        let found = false;
         let startingSegment: SponsorTime = null;
         for (const time of sponsorTimes) {
             if (time.segment[0] <= video.currentTime && time.segment[0] > startingSegmentTime && time.segment[1] > video.currentTime 
                     && getCategoryActionType(time.category) === CategoryActionType.Skippable) {
                         startingSegmentTime = time.segment[0];
                         startingSegment = time;
+                        found = true;
                 break;
             }
         }
-        if (startingSegmentTime === -1) {
+        if (!found) {
             for (const time of sponsorTimesSubmitting) {
                 if (time.segment[0] <= video.currentTime && time.segment[0] > startingSegmentTime && time.segment[1] > video.currentTime 
                         && getCategoryActionType(time.category) === CategoryActionType.Skippable) {
                             startingSegmentTime = time.segment[0];
                             startingSegment = time;
+                            found = true;
                     break;
                 }
             }
@@ -840,7 +851,7 @@ function getYouTubeVideoID(url: string): string | boolean {
     if(url.startsWith("https://www.youtube.com/tv#/")) url = url.replace("#", "");
 
     //Attempt to parse url
-    let urlObject = null;
+    let urlObject: URL = null;
     try { 
         urlObject = new URL(url);
     } catch (e) {      
@@ -866,9 +877,10 @@ function getYouTubeVideoID(url: string): string | boolean {
     if (urlObject.searchParams.has("v") && ["/watch", "/watch/"].includes(urlObject.pathname) || urlObject.pathname.startsWith("/tv/watch")) {
         const id = urlObject.searchParams.get("v");
         return id.length == 11 ? id : false;
-    } else if (urlObject.pathname.startsWith("/embed/")) {
+    } else if (urlObject.pathname.startsWith("/embed/") || urlObject.pathname.startsWith("/shorts/")) {
         try {
-            return urlObject.pathname.substr(7, 11);
+            const id = urlObject.pathname.split("/")[2];
+            if (id && id.length >= 11) return id.substr(0, 11);
         } catch (e) {
             console.error("[SB] Video ID not valid for " + url);
             return false;
@@ -919,7 +931,7 @@ function updatePreviewBar(): void {
         });
     });
 
-    previewBar.set(previewBarSegments, video.duration)
+    previewBar.set(previewBarSegments, video?.duration)
 
     if (Config.config.showTimeWithSkips) {
         const skippedDuration = utils.getTimestampsDuration(previewBarSegments.map(({segment}) => segment));
@@ -1387,7 +1399,7 @@ function getRealCurrentTime(): number {
 
     if (playButtonSVGData === replaceSVGData) {
         // At the end of the video
-        return video.duration;
+        return video?.duration;
     } else {
         return video.currentTime;
     }
@@ -1887,7 +1899,7 @@ function showTimeWithoutSkips(skippedDuration: number): void {
         display.appendChild(duration);
     }
     
-    const durationAfterSkips = utils.getFormattedTime(video.duration - skippedDuration)
+    const durationAfterSkips = utils.getFormattedTime(video?.duration - skippedDuration)
 
     duration.innerText = (durationAfterSkips == null || skippedDuration <= 0) ? "" : " (" + durationAfterSkips + ")";
 }
