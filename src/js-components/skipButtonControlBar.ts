@@ -28,6 +28,14 @@ export class SkipButtonControlBar {
 
     skip: (segment: SponsorTime) => void;
 
+    // Used if on mobile page
+    hideButton: () => void;
+    showButton: () => void;
+
+    // Used by mobile only for swiping away
+    left = 0;
+    swipeStart = 0;
+
     constructor(props: SkipButtonControlBarProps) {
         this.skip = props.skip;
         this.onMobileYouTube = props.onMobileYouTube;
@@ -49,6 +57,11 @@ export class SkipButtonControlBar {
         this.container.addEventListener("click", () => this.toggleSkip());
         this.container.addEventListener("mouseenter", () => this.stopTimer());
         this.container.addEventListener("mouseleave", () => this.startTimer());
+        if (this.onMobileYouTube) {
+            this.container.addEventListener("touchstart", (e) => this.handleTouchStart(e));
+            this.container.addEventListener("touchmove", (e) => this.handleTouchMove(e));
+            this.container.addEventListener("touchend", () => this.handleTouchEnd());
+        }
     }
 
     getElement(): HTMLElement {
@@ -68,6 +81,10 @@ export class SkipButtonControlBar {
 
             if (Config.config.autoHideInfoButton && !this.onMobileYouTube) {
                 utils.setupAutoHideAnimation(this.skipIcon, mountingContainer, false, false);
+            } else {
+                const { hide, show } = utils.setupCustomHideAnimation(this.skipIcon, mountingContainer, false, false);
+                this.hideButton = hide;
+                this.showButton = show;
             }
         }
     }
@@ -116,14 +133,14 @@ export class SkipButtonControlBar {
         this.timeout = setTimeout(() => this.disableText(), Math.max(Config.config.skipNoticeDuration, this.duration) * 1000);
     }
 
-    disable(keepActive = false): void {
+    disable(): void {
         this.container.classList.add("hidden");
         this.textContainer?.classList?.remove("hidden");
 
         this.chapterText?.classList?.remove("hidden");
         this.getChapterPrefix()?.classList?.remove("hidden");
 
-        if (!keepActive) this.enabled = false;
+        this.enabled = false;
     }
 
     toggleSkip(): void {
@@ -131,19 +148,22 @@ export class SkipButtonControlBar {
         this.disableText();
     }
 
-    disableText(forceNotDisable = false): void {
-        if (!forceNotDisable && (Config.config.hideVideoPlayerControls || Config.config.hideSkipButtonPlayerControls || this.onMobileYouTube)) {
-            this.disable(this.onMobileYouTube);
+    disableText(): void {
+        if (Config.config.hideVideoPlayerControls || Config.config.hideSkipButtonPlayerControls) {
+            this.disable();
             return;
         }
 
-        this.container.classList.remove("hidden");
+        this.container.classList.add("textDisabled");
         this.textContainer?.classList?.add("hidden");
         this.chapterText?.classList?.remove("hidden");
 
         this.getChapterPrefix()?.classList?.add("hidden");
 
         utils.enableAutoHideAnimation(this.skipIcon);
+        if (this.onMobileYouTube) {
+            this.hideButton();
+        }
     }
 
     updateMobileControls(): void {
@@ -151,10 +171,9 @@ export class SkipButtonControlBar {
 
         if (overlay && this.enabled) {
             if (overlay?.classList?.contains("pointer-events-off")) {
-                this.disable(true);
+                this.hideButton();
             } else {
-                this.disableText(true);
-                this.skipIcon.classList.remove("hidden");
+                this.showButton();
             }
         }
     }
@@ -165,6 +184,38 @@ export class SkipButtonControlBar {
 
     private getChapterPrefix(): HTMLElement {
         return document.querySelector(".ytp-chapter-title-prefix");
+    }
+
+    // Swiping away on mobile
+    private handleTouchStart(event: TouchEvent): void {
+        this.swipeStart = event.touches[0].clientX;
+    }
+
+    // Swiping away on mobile
+    private handleTouchMove(event: TouchEvent): void {
+        const distanceMoved = this.swipeStart - event.touches[0].clientX;
+        this.left = Math.min(-distanceMoved, 0);
+
+        this.updateLeftStyle();
+    }
+
+    // Swiping away on mobile
+    private handleTouchEnd(): void {
+        if (this.left < -this.container.offsetWidth / 2) {
+            this.disableText();
+
+            // Don't let animation play
+            this.skipIcon.style.display = "none";
+            setTimeout(() => this.skipIcon.style.removeProperty("display"), 200);
+        }
+
+        this.left = 0;
+        this.updateLeftStyle();
+    }
+
+    // Swiping away on mobile
+    private updateLeftStyle() {
+        this.container.style.left = this.left + "px";
     }
 }
 
