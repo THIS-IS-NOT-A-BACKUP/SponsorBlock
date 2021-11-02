@@ -396,13 +396,6 @@ function createPreviewBar(): void {
 function durationChangeListener(): void {
     updateAdFlag();
     updatePreviewBar();
-
-    if (sponsorTimes) sponsorTimes = sponsorTimes.filter(segmentDurationFilter);
-}
-
-function segmentDurationFilter(segment: SponsorTime): boolean {
-    return segment.videoDuration === 0 || !video?.duration 
-            || switchingVideos || Math.abs(video.duration - segment.videoDuration) < 2;
 }
 
 function cancelSponsorSchedule(): void {
@@ -687,8 +680,7 @@ async function sponsorsLookup(id: string, keepOldSubmissions = true) {
     if (response?.ok) {
         const recievedSegments: SponsorTime[] = JSON.parse(response.responseText)
                     ?.filter((video) => video.videoID === id)
-                    ?.map((video) => video.segments)[0]
-                    ?.filter(segmentDurationFilter);
+                    ?.map((video) => video.segments)[0];
         if (!recievedSegments || !recievedSegments.length) { 
             // return if no video found
             retryFetch();
@@ -1441,9 +1433,10 @@ function getRealCurrentTime(): number {
 }
 
 function startOrEndTimingNewSegment() {
+    const roundedTime = Math.round((getRealCurrentTime() + Number.EPSILON) * 1000) / 1000;
     if (!isSegmentCreationInProgress()) {
         sponsorTimesSubmitting.push({
-            segment: [getRealCurrentTime()],
+            segment: [roundedTime],
             UUID: null,
             category: Config.config.defaultCategory,
             actionType: ActionType.Skip,
@@ -1453,7 +1446,7 @@ function startOrEndTimingNewSegment() {
         // Finish creating the new segment
         const existingSegment = getIncompleteSegment();
         const existingTime = existingSegment.segment[0];
-        const currentTime = getRealCurrentTime();
+        const currentTime = roundedTime;
             
         // Swap timestamps if the user put the segment end before the start
         existingSegment.segment = [Math.min(existingTime, currentTime), Math.max(existingTime, currentTime)];
