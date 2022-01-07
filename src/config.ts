@@ -21,6 +21,7 @@ interface SBConfig {
     showTimeWithSkips: boolean,
     disableSkipping: boolean,
     muteSegments: boolean,
+    fullVideoSegments: boolean,
     trackViewCount: boolean,
     trackViewCountInPrivate: boolean,
     dontShowNotice: boolean,
@@ -52,6 +53,7 @@ interface SBConfig {
         locked: string
     },
     scrollToEditTimeUpdate: boolean,
+    categoryPillUpdate: boolean,
 
     // What categories should be skipped
     categorySelections: CategorySelection[],
@@ -177,6 +179,7 @@ const Config: SBObject = {
         showTimeWithSkips: true,
         disableSkipping: false,
         muteSegments: true,
+        fullVideoSegments: true,
         trackViewCount: true,
         trackViewCountInPrivate: true,
         dontShowNotice: false,
@@ -203,6 +206,7 @@ const Config: SBObject = {
         autoHideInfoButton: true,
         autoSkipOnMusicVideos: false,
         scrollToEditTimeUpdate: false, // false means the tooltip will be shown
+        categoryPillUpdate: false,
 
         categorySelections: [{
             name: "sponsor" as Category,
