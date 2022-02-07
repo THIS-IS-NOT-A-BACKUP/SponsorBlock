@@ -22,7 +22,7 @@ async function init() {
 
     // selected tab
     if (location.hash != "") {
-        const substr = location.hash.substring(1);
+        const substr = location.hash.slice(1);
         let menuItem = document.querySelector(`[data-for='${substr}']`);
         if (menuItem == null)
             menuItem = document.querySelector(`[data-for='behavior']`);
@@ -44,8 +44,8 @@ async function init() {
         createStickyHeader();
     }
 
-    if (!Config.configListeners.includes(optionsConfigUpdateListener)) {
-        Config.configListeners.push(optionsConfigUpdateListener);
+    if (!Config.configSyncListeners.includes(optionsConfigUpdateListener)) {
+        Config.configSyncListeners.push(optionsConfigUpdateListener);
     }
 
     await utils.wait(() => Config.config !== null);
@@ -54,8 +54,10 @@ async function init() {
         document.documentElement.setAttribute("data-theme", "light");
     }
 
+    const donate = document.getElementById("sbDonate");
+    donate.addEventListener("click", () => Config.config.donateClicked = Config.config.donateClicked + 1);
     if (!showDonationLink()) {
-        document.getElementById("sbDonate").classList.add("hidden");
+        donate.classList.add("hidden");
     }
 
     // Set all of the toggle options to the correct option
@@ -85,6 +87,7 @@ async function init() {
                 const reverse = optionsElements[i].getAttribute("data-toggle-type") === "reverse";
 
                 const confirmMessage = optionsElements[i].getAttribute("data-confirm-message");
+                const confirmOnTrue = optionsElements[i].getAttribute("data-confirm-on") !== "false";
 
                 if (optionResult != undefined)
                     checkbox.checked =  reverse ? !optionResult : optionResult;
@@ -99,8 +102,9 @@ async function init() {
                 // Add click listener
                 checkbox.addEventListener("click", async () => {
                     // Confirm if required
-                    if (checkbox.checked && confirmMessage && !confirm(chrome.i18n.getMessage(confirmMessage))){
-                        checkbox.checked = false;
+                    if (confirmMessage && ((confirmOnTrue && checkbox.checked) || (!confirmOnTrue && !checkbox.checked)) 
+                            && !confirm(chrome.i18n.getMessage(confirmMessage))){
+                        checkbox.checked = !checkbox.checked;
                         return;
                     }
 
@@ -131,6 +135,11 @@ async function init() {
                                 document.documentElement.setAttribute("data-theme", "dark");
                             } else {
                                 document.documentElement.setAttribute("data-theme", "light");
+                            }
+                            break;
+                        case "trackDownvotes":
+                            if (!checkbox.checked) {
+                                Config.local.downvotedSegments = {};
                             }
                             break;
                     }
@@ -193,7 +202,7 @@ async function init() {
                 textChangeResetButton.addEventListener("click", () => {
                     if (!confirm(chrome.i18n.getMessage("areYouSureReset"))) return;
 
-                    Config.config[option] = Config.defaults[option];
+                    Config.config[option] = Config.syncDefaults[option];
 
                     textChangeInput.value = Config.config[option];
                 });
@@ -245,7 +254,7 @@ async function init() {
                 const numberInput = optionsElements[i].querySelector("input");
 
                 if (isNaN(configValue) || configValue < 0) {
-                    numberInput.value = Config.defaults[option];
+                    numberInput.value = Config.syncDefaults[option];
                 } else {
                     numberInput.value = configValue;
                 }
@@ -494,16 +503,10 @@ function activatePrivateTextChange(element: HTMLElement) {
     }
     
     let result = Config.config[option];
-
     // See if anything extra must be done
     switch (option) {
         case "*": {
-            const jsonData = JSON.parse(JSON.stringify(Config.localConfig));
-
-            // Fix segmentTimes data as it is destroyed from the JSON stringify
-            jsonData.segmentTimes = Config.encodeStoredItem(Config.localConfig.segmentTimes);
-
-            result = JSON.stringify(jsonData);
+            result = JSON.stringify(Config.cachedSyncConfig);
             break;
         }
     }
@@ -557,7 +560,6 @@ async function setTextOption(option: string, element: HTMLElement, value: string
                     for (const key in newConfig) {
                         Config.config[key] = newConfig[key];
                     }
-                    Config.convertJSON();
 
                     if (newConfig.supportInvidious) {
                         const checkbox = <HTMLInputElement> document.querySelector("#support-invidious > div > label > input");
@@ -584,8 +586,7 @@ async function setTextOption(option: string, element: HTMLElement, value: string
 
 function downloadConfig() {
     const file = document.createElement("a");
-    const jsonData = JSON.parse(JSON.stringify(Config.localConfig));
-    jsonData.segmentTimes = Config.encodeStoredItem(Config.localConfig.segmentTimes);
+    const jsonData = JSON.parse(JSON.stringify(Config.cachedSyncConfig));
     file.setAttribute("href", "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(jsonData)));
     file.setAttribute("download", "SponsorBlockConfig.json");
     document.body.append(file);
@@ -639,12 +640,9 @@ function copyDebugOutputToClipboard() {
             language: navigator.language,
             extensionVersion: chrome.runtime.getManifest().version
         },
-        config: JSON.parse(JSON.stringify(Config.localConfig)) // Deep clone config object
+        config: JSON.parse(JSON.stringify(Config.cachedSyncConfig)) // Deep clone config object
     };
 
-    // Fix segmentTimes data as it is destroyed from the JSON stringify
-    output.config.segmentTimes = Config.encodeStoredItem(Config.localConfig.segmentTimes);
-    
     // Sanitise sensitive user config values
     delete output.config.userID;
     output.config.serverAddress = (output.config.serverAddress === CompileConfig.serverAddress) 

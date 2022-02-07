@@ -209,6 +209,15 @@
     "enableViewTrackingInPrivate": {
         "message": "Enable Skip Count Tracking In Private/Incognito tabs"
     },
+    "enableTrackDownvotes": {
+        "message": "Store segment downvotes"
+    },
+    "whatTrackDownvotes": {
+        "message": "Any segments you downvote will remain hidden even after refreshing"
+    },
+    "trackDownvotesWarning": {
+        "message": "Warning: Disabling this will delete all previously stored downvotes"
+    },
     "enableQueryByHashPrefix": {
         "message": "Query By Hash Prefix"
     },
@@ -349,9 +358,6 @@
     "youHaveSkipped": {
         "message": "You've skipped "
     },
-    "youHaveSaved": {
-        "message": "You have saved yourself "
-    },
     "minLower": {
         "message": "minute"
     },
@@ -365,10 +371,12 @@
         "message": "hours"
     },
     "youHaveSavedTime": {
-        "message": "You've saved people"
+        "message": "You've saved people",
+        "description": "You've saved people from 887,362 segments (236d 15h 5.3 minutes of their lives)."
     },
     "youHaveSavedTimeEnd": {
-        "message": " of their lives"
+        "message": " of their lives",
+        "description": "You've saved people from 887,362 segments (236d 15h 5.3 minutes of their lives)."
     },
     "statusReminder": {
         "message": "Check status.sponsor.ajay.app for server status."
@@ -584,7 +592,7 @@
         "message": "Quick recap of previous episodes, or a preview of what's coming up later in the current video. Meant for edited together clips, not for spoken summaries."
     },
     "category_filler": {
-        "message": "Filler Tangent"
+        "message": "Filler Tangent/Jokes"
     },
     "category_filler_description": {
         "message": "Tangential scenes added only for filler or humor that are not required to understand the main content of the video. This should not include segments providing context or background details."
@@ -647,9 +655,6 @@
         "message": "Show an icon when a video is entirely an advertisement",
         "description": "Referring to the category pill that is now shown on videos that are entirely sponsor or entirely selfpromo"
     },
-    "colorFormatIncorrect": {
-        "message": "Your color is formatted incorrectly. It should be a 3 or 6 digit hex code with a number sign at the beginning."
-    },
     "previewColor": {
         "message": "Unsubmitted Color",
         "description": "Referring to submissions that have not been sent to the server yet."
@@ -700,6 +705,9 @@
     },
     "hiddenDueToDuration": {
         "message": "hidden: too short"
+    },
+    "manuallyHidden": {
+        "message": "manually hidden"
     },
     "channelDataNotFound": {
         "description": "This error appears in an alert when they try to whitelist a channel and the extension is unable to determine what channel they are looking at.",
@@ -786,6 +794,9 @@
     },
     "Donate": {
         "message": "Donate"
+    },
+    "considerDonating": {
+        "message": "Help fund development"
     },
     "hideDonationLink": {
         "message": "Hide Donation Link"

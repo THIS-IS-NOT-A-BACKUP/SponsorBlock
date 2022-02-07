@@ -1,7 +1,7 @@
 {
     "name": "__MSG_fullName__",
     "short_name": "SponsorBlock",
-    "version": "4.0.5",
+    "version": "4.1",
     "default_locale": "en",
     "description": "__MSG_Description__",
     "homepage_url": "https://sponsor.ajay.app",
@@ -47,6 +47,9 @@
         "icons/beep.ogg",
         "icons/pause.svg",
         "icons/stop.svg",
+        "icons/heart.svg",
+        "icons/visible.svg",
+        "icons/not_visible.svg",
         "icons/PlayerInfoIconSponsorBlocker.svg",
         "icons/PlayerDeleteIconSponsorBlocker.svg",
         "popup.html",

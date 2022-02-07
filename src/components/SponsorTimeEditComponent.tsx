@@ -72,7 +72,7 @@ class SponsorTimeEditComponent extends React.Component<SponsorTimeEditProps, Spo
         // Add as a config listener
         if (!this.configUpdateListener) {
             this.configUpdateListener = () => this.configUpdate();
-            Config.configListeners.push(this.configUpdate.bind(this));
+            Config.configSyncListeners.push(this.configUpdate.bind(this));
         }
 
         this.checkToShowFullVideoWarning();
@@ -80,7 +80,7 @@ class SponsorTimeEditComponent extends React.Component<SponsorTimeEditProps, Spo
 
     componentWillUnmount(): void {
         if (this.configUpdateListener) {
-            Config.configListeners.splice(Config.configListeners.indexOf(this.configUpdate.bind(this)), 1);
+            Config.configSyncListeners.splice(Config.configSyncListeners.indexOf(this.configUpdate.bind(this)), 1);
         }
     }
 
@@ -509,7 +509,8 @@ class SponsorTimeEditComponent extends React.Component<SponsorTimeEditProps, Spo
         const inputActionType = this.actionTypeOptionRef?.current?.value as ActionType;
         sponsorTimesSubmitting[this.props.index].actionType = this.getNextActionType(category, inputActionType);
 
-        Config.config.segmentTimes.set(this.props.contentContainer().sponsorVideoID, sponsorTimesSubmitting);
+        Config.config.unsubmittedSegments[this.props.contentContainer().sponsorVideoID] = sponsorTimesSubmitting;
+        Config.forceSyncUpdate("unsubmittedSegments");
 
         this.props.contentContainer().updatePreviewBar();
 
@@ -555,7 +556,12 @@ class SponsorTimeEditComponent extends React.Component<SponsorTimeEditProps, Spo
         sponsorTimes.splice(index, 1);
   
         //save this
-        Config.config.segmentTimes.set(this.props.contentContainer().sponsorVideoID, sponsorTimes);
+        if (sponsorTimes.length > 0) {
+            Config.config.unsubmittedSegments[this.props.contentContainer().sponsorVideoID] = sponsorTimes;
+        } else {
+            delete Config.config.unsubmittedSegments[this.props.contentContainer().sponsorVideoID];
+        }
+        Config.forceSyncUpdate("unsubmittedSegments");
 
         this.props.contentContainer().updatePreviewBar();
         

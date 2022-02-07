@@ -31,6 +31,8 @@ export interface FetchResponse {
     ok: boolean
 }
 
+export type HashedValue = string & { __hashBrand: unknown };
+
 export interface VideoDurationResponse {
     duration: number;
 }
@@ -49,7 +51,8 @@ export interface CategorySelection {
 export enum SponsorHideType {
     Visible = undefined,
     Downvoted = 1,
-    MinimumDuration
+    MinimumDuration,
+    Hidden,
 }
 
 export enum ActionType {
