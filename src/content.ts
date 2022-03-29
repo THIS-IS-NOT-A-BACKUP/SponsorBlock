@@ -45,6 +45,8 @@ let lastKnownVideoTime: { videoTime: number, preciseTime: number } = {
     videoTime: null,
     preciseTime: null
 };
+// It resumes with a slightly later time on chromium
+let lastTimeFromWaitingEvent = null;
 
 // Skips are scheduled to ensure precision.
 // Skips are rescheduled every seeking event.
@@ -456,14 +458,16 @@ function startSponsorSchedule(includeIntersectingSegments = false, currentTime?:
 
     if (!video || video.paused) return;
     if (currentTime === undefined || currentTime === null) {
-        const virtualTime = lastKnownVideoTime.videoTime ?
-            (performance.now() - lastKnownVideoTime.preciseTime) / 1000 + lastKnownVideoTime.videoTime : null;
-        if (!utils.isFirefox() && !isSafari() && virtualTime && Math.abs(virtualTime - video.currentTime) < 0.6){
+        const virtualTime = lastTimeFromWaitingEvent ?? (lastKnownVideoTime.videoTime ?
+            (performance.now() - lastKnownVideoTime.preciseTime) / 1000 + lastKnownVideoTime.videoTime : null);
+        if ((lastTimeFromWaitingEvent || !utils.isFirefox()) 
+                && !isSafari() && virtualTime && Math.abs(virtualTime - video.currentTime) < 0.6){
             currentTime = virtualTime;
         } else {
             currentTime = video.currentTime;
         }
     }
+    lastTimeFromWaitingEvent = null;
 
     if (videoMuted && !inMuteSegment(currentTime)) {
         video.muted = false;
@@ -535,8 +539,8 @@ function startSponsorSchedule(includeIntersectingSegments = false, currentTime?:
         startSponsorSchedule(forcedIncludeIntersectingSegments, forcedSkipTime, forcedIncludeNonIntersectingSegments);
     };
 
-    if (timeUntilSponsor <= 0) {
-        skippingFunction();
+    if (timeUntilSponsor < 0.003) {
+        skippingFunction(currentTime);
     } else {
         const delayTime = timeUntilSponsor * 1000 * (1 / video.playbackRate);
         if (delayTime < 300) {
@@ -680,6 +684,7 @@ function setupVideoListeners() {
                 lastCheckVideoTime = video.currentTime;
 
                 updateVirtualTime();
+                lastTimeFromWaitingEvent = null;
 
                 startSponsorSchedule();
             }
@@ -696,6 +701,7 @@ function setupVideoListeners() {
                 videoTime: null,
                 preciseTime: null
             }
+            lastTimeFromWaitingEvent = video.currentTime;
 
             cancelSponsorSchedule();
         };
@@ -1120,11 +1126,12 @@ function updatePreviewBar(): void {
 async function whitelistCheck() {
     const whitelistedChannels = Config.config.whitelistedChannels;
 
-    const getChannelID = () => videoInfo?.videoDetails?.channelId
-        ?? document.querySelector(".ytd-channel-name a")?.getAttribute("href")?.replace(/\/.+\//, "") // YouTube
-        ?? document.querySelector(".ytp-title-channel-logo")?.getAttribute("href")?.replace(/https:\/.+\//, "") // YouTube Embed
-        ?? document.querySelector("a > .channel-profile")?.parentElement?.getAttribute("href")?.replace(/\/.+\//, "") // Invidious
-        ?? document.querySelector("a.slim-owner-icon-and-title")?.getAttribute("href")?.replace(/\/.+\//, ""); // Mobile YouTube
+    const getChannelID = () =>
+        (document.querySelector("a.ytd-video-owner-renderer") // YouTube
+        ?? document.querySelector("a.ytp-title-channel-logo") // YouTube Embed
+        ?? document.querySelector(".channel-profile #channel-name")?.parentElement.parentElement // Invidious
+        ?? document.querySelector("a.slim-owner-icon-and-title")) // Mobile YouTube
+            ?.getAttribute("href")?.match(/\/channel\/(UC[a-zA-Z0-9_-]{22})/)[1];
 
     try {
         await utils.wait(() => !!getChannelID(), 6000, 20);
