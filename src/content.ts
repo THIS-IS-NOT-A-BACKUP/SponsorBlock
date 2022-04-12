@@ -234,6 +234,9 @@ function contentConfigUpdateListener(changes: StorageChangesObject) {
             case "hideDeleteButtonPlayerControls":
                 updateVisibilityOfPlayerControlsButton()
                 break;
+            case "categorySelections":
+                sponsorsLookup(sponsorVideoID);
+                break;
         }
     }
 }
@@ -1911,6 +1914,8 @@ async function sendSubmitMessage() {
         alert(chrome.i18n.getMessage("liveOrPremiere"));
         return;
     }
+
+    sponsorsLookup(sponsorVideoID);
 
     // Add loading animation
     playerButtons.submit.image.src = chrome.extension.getURL("icons/PlayerUploadIconSponsorBlocker.svg");
