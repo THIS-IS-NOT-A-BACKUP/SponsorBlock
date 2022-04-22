@@ -1357,12 +1357,17 @@ function skipToTime({v, skipTime, skippingSegments, openNotice, forceAutoSkip, u
         if (openNotice) {
             //send out the message saying that a sponsor message was skipped
             if (!Config.config.dontShowNotice || !autoSkip) {
-                const newSkipNotice = new SkipNotice(skippingSegments, autoSkip, skipNoticeContentContainer, unskipTime);
-                if (onMobileYouTube || Config.config.skipKeybind == null) newSkipNotice.setShowKeybindHint(false);
-                skipNotices.push(newSkipNotice);
-
+                createSkipNotice(skippingSegments, autoSkip, unskipTime, false);
+            } else if (autoSkip) {
                 activeSkipKeybindElement?.setShowKeybindHint(false);
-                activeSkipKeybindElement = newSkipNotice;
+                activeSkipKeybindElement = {
+                    setShowKeybindHint: () => {}, //eslint-disable-line @typescript-eslint/no-empty-function
+                    toggleSkip: () => {
+                        unskipSponsorTime(skippingSegments[0], unskipTime);
+
+                        createSkipNotice(skippingSegments, autoSkip, unskipTime, true);
+                    }
+                };
             }
         }
     }
@@ -1371,19 +1376,30 @@ function skipToTime({v, skipTime, skippingSegments, openNotice, forceAutoSkip, u
     if (autoSkip) sendTelemetryAndCount(skippingSegments, skipTime[1] - skipTime[0], true);
 }
 
-function unskipSponsorTime(segment: SponsorTime, unskipTime: number = null) {
+function createSkipNotice(skippingSegments: SponsorTime[], autoSkip: boolean, unskipTime: number, startReskip: boolean) {
+    const newSkipNotice = new SkipNotice(skippingSegments, autoSkip, skipNoticeContentContainer, unskipTime, startReskip);
+    if (onMobileYouTube || Config.config.skipKeybind == null) newSkipNotice.setShowKeybindHint(false);
+    skipNotices.push(newSkipNotice);
+
+    activeSkipKeybindElement?.setShowKeybindHint(false);
+    activeSkipKeybindElement = newSkipNotice;
+}
+
+function unskipSponsorTime(segment: SponsorTime, unskipTime: number = null, forceSeek = false) {
     if (segment.actionType === ActionType.Mute) {
         video.muted = false;
         videoMuted = false;
-    } else {
+    }
+    
+    if (forceSeek || segment.actionType === ActionType.Skip) {
         //add a tiny bit of time to make sure it is not skipped again
         video.currentTime = unskipTime ?? segment.segment[0] + 0.001;
     }
 
 }
 
-function reskipSponsorTime(segment: SponsorTime) {
-    if (segment.actionType === ActionType.Mute) {
+function reskipSponsorTime(segment: SponsorTime, forceSeek = false) {
+    if (segment.actionType === ActionType.Mute && !forceSeek) {
         video.muted = true;
         videoMuted = true;
     } else {
