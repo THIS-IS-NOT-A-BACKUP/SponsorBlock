@@ -391,18 +391,32 @@ function handleMobileControlsMutations(): void {
 function createPreviewBar(): void {
     if (previewBar !== null) return;
 
-    const progressElementSelectors = [
-        // For mobile YouTube
-        ".progress-bar-background",
-        // For YouTube
-        ".ytp-progress-bar-container",
-        ".no-model.cue-range-markers",
-        // For Invidious/VideoJS
-        ".vjs-progress-holder"
+    const progressElementOptions = [{
+            // For mobile YouTube
+            selector: ".progress-bar-background",
+            isVisibleCheck: true
+        }, {
+            // For new mobile YouTube (#1287)
+            selector: ".ytm-progress-bar",
+            isVisibleCheck: true
+        }, {
+            // For Desktop YouTube
+            selector: ".ytp-progress-bar-container",
+            isVisibleCheck: true
+        }, {
+            // For Desktop YouTube
+            selector: ".no-model.cue-range-marker",
+            isVisibleCheck: true
+        }, {
+            // For Invidious/VideoJS
+            selector: ".vjs-progress-holder",
+            isVisibleCheck: false
+        }
     ];
 
-    for (const selector of progressElementSelectors) {
-        const el = findValidElement(document.querySelectorAll(selector));
+    for (const option of progressElementOptions) {
+        const allElements = document.querySelectorAll(option.selector) as NodeListOf<HTMLElement>;
+        const el = option.isVisibleCheck ? findValidElement(allElements) : allElements[0];
 
         if (el) {
             previewBar = new PreviewBar(el, onMobileYouTube, onInvidious);
@@ -456,6 +470,7 @@ function startSponsorSchedule(includeIntersectingSegments = false, currentTime?:
         // Reset lastCheckVideoTime
         lastCheckVideoTime = -1;
         lastCheckTime = 0;
+        console.warn("[SB] Ad playing, pausing skipping");
 
         return;
     }
@@ -548,7 +563,7 @@ function startSponsorSchedule(includeIntersectingSegments = false, currentTime?:
     } else {
         const delayTime = timeUntilSponsor * 1000 * (1 / video.playbackRate);
         if (delayTime < 300) {
-            // For Firefox, use interval instead of timeout near the end to combat imprecise video time
+            // Use interval instead of timeout near the end to combat imprecise video time
             const startIntervalTime = performance.now();
             const startVideoTime = Math.max(currentTime, video.currentTime);
             currentSkipInterval = setInterval(() => {
@@ -709,8 +724,12 @@ function setupVideoListeners() {
 
             cancelSponsorSchedule();
         };
-        video.addEventListener('pause', paused);
-        video.addEventListener('waiting', paused);
+        video.addEventListener('pause', () => paused());
+        video.addEventListener('waiting', () => {
+            paused();
+            
+            console.warn("[SB] Not skipping due to buffering");
+        });
 
         startSponsorSchedule();
     }
