@@ -321,9 +321,6 @@ async function videoIDChange(id) {
         }
     }
 
-    // Get new video info
-    // getVideoInfo(); // Seems to have been replaced
-
     // Update whitelist data when the video data is loaded
     whitelistCheck();
 
@@ -575,6 +572,8 @@ function startSponsorSchedule(includeIntersectingSegments = false, currentTime?:
             // Use interval instead of timeout near the end to combat imprecise video time
             const startIntervalTime = performance.now();
             const startVideoTime = Math.max(currentTime, video.currentTime);
+            logDebug(`Starting setInterval skipping ${video.currentTime} to skip at ${skipTime[0]}`);
+
             currentSkipInterval = setInterval(() => {
                 const intervalDuration = performance.now() - startIntervalTime;
                 if (intervalDuration >= delayTime || video.currentTime >= skipTime[0]) {
@@ -589,6 +588,8 @@ function startSponsorSchedule(includeIntersectingSegments = false, currentTime?:
                 }
             }, 1);
         } else {
+            logDebug(`Starting timeout to skip ${video.currentTime} to skip at ${skipTime[0]}`);
+            
             // Schedule for right before to be more precise than normal timeout
             currentSkipSchedule = setTimeout(skippingFunction, Math.max(0, delayTime - 100));
         }
@@ -938,12 +939,10 @@ function startSkipScheduleCheckingForStartSponsors() {
         // See if there are any starting sponsors
         let startingSegmentTime = getStartTimeFromUrl(document.URL) || -1;
         let found = false;
-        let startingSegment: SponsorTime = null;
         for (const time of sponsorTimes) {
             if (time.segment[0] <= video.currentTime && time.segment[0] > startingSegmentTime && time.segment[1] > video.currentTime
                     && time.actionType !== ActionType.Poi) {
                         startingSegmentTime = time.segment[0];
-                        startingSegment = time;
                         found = true;
                 break;
             }
@@ -953,7 +952,6 @@ function startSkipScheduleCheckingForStartSponsors() {
                 if (time.segment[0] <= video.currentTime && time.segment[0] > startingSegmentTime && time.segment[1] > video.currentTime
                         && time.actionType !== ActionType.Poi) {
                             startingSegmentTime = time.segment[0];
-                            startingSegment = time;
                             found = true;
                     break;
                 }
@@ -988,26 +986,6 @@ function startSkipScheduleCheckingForStartSponsors() {
         } else {
             startSponsorSchedule();
         }
-    }
-}
-
-/**
- * Get the video info for the current tab from YouTube
- *
- * TODO: Replace
- */
-async function getVideoInfo(): Promise<void> {
-    const result = await utils.asyncRequestToCustomServer("GET", "https://www.youtube.com/get_video_info?video_id=" + sponsorVideoID + "&html5=1&c=TVHTML5&cver=7.20190319");
-
-    if (result.ok) {
-        const decodedData = decodeURIComponent(result.responseText).match(/player_response=([^&]*)/)[1];
-        if (!decodedData) {
-            console.error("[SB] Failed at getting video info from YouTube.");
-            console.error("[SB] Data returned from YouTube: " + result.responseText);
-            return;
-        }
-
-        videoInfo = JSON.parse(decodedData);
     }
 }
 
@@ -1145,7 +1123,7 @@ async function whitelistCheck() {
         ?? document.querySelector("a.ytp-title-channel-logo") // YouTube Embed
         ?? document.querySelector(".channel-profile #channel-name")?.parentElement.parentElement // Invidious
         ?? document.querySelector("a.slim-owner-icon-and-title")) // Mobile YouTube
-            ?.getAttribute("href")?.match(/\/channel\/(UC[a-zA-Z0-9_-]{22})|\/c\/([a-zA-Z0-9_-]+)/)?.[1];
+            ?.getAttribute("href")?.match(/(?:\/c\/|\/channel\/)(UC[a-zA-Z0-9_-]{22}|[a-zA-Z0-9_-]+)/)?.[1];
 
     try {
         await utils.wait(() => !!getChannelID(), 6000, 20);
