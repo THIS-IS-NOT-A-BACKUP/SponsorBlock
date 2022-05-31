@@ -55,6 +55,7 @@ interface SBConfig {
     scrollToEditTimeUpdate: boolean,
     categoryPillUpdate: boolean,
     darkMode: boolean,
+    showCategoryGuidelines: boolean,
 
     // Used to cache calculated text color info
     categoryPillColors: {
@@ -167,6 +168,7 @@ const Config: SBObject = {
         scrollToEditTimeUpdate: false, // false means the tooltip will be shown
         categoryPillUpdate: false,
         darkMode: true,
+        showCategoryGuidelines: true,
 
         categoryPillColors: {},
 
@@ -370,8 +372,20 @@ function configProxy(): { sync: SBConfig, local: SBStorage } {
 }
 
 function forceSyncUpdate(prop: string): void {
+    const value = Config.cachedSyncConfig[prop];
+    if (prop === "unsubmittedSegments") {
+        // Early to be safe
+        if (JSON.stringify(value).length + prop.length > 8000) {
+            for (const key in value) {
+                if (!value[key] || value[key].length <= 0) {
+                    delete value[key];
+                }
+            }
+        }
+    }
+
     chrome.storage.sync.set({
-        [prop]: Config.cachedSyncConfig[prop]
+        [prop]: value
     });
 }
 
