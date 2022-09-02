@@ -25,6 +25,16 @@
     "Segments": {
         "message": "segments"
     },
+    "SegmentsCap": {
+        "message": "Segments"
+    },
+    "Chapters": {
+        "message": "Chapters"
+    },
+    "renderAsChapters": {
+        "message": "Render segments as chapters",
+        "description": "Refers to drawing segments on the YouTube seek bar as split up chapters, similar to the existing chapter system"
+    },
     "upvoteButtonInfo": {
         "message": "Upvote this submission"
     },
@@ -114,6 +124,9 @@
     },
     "SubmitTimes": {
         "message": "Submit Segments"
+    },
+    "sortSegments": {
+        "message": "Sort Segments"
     },
     "submitCheck": {
         "message": "Are you sure you want to submit this?"
@@ -287,6 +300,14 @@
     },
     "setSubmitKeybind": {
         "message": "Submit segments",
+        "description": "Keybind label"
+    },
+    "nextChapterKeybind": {
+        "message": "Next chapter",
+        "description": "Keybind label"
+    },
+    "previousChapterKeybind": {
+        "message": "Previous chapter",
         "description": "Keybind label"
     },
     "keybindDescription": {
@@ -545,6 +566,10 @@
         "message": "to",
         "description": "Used between segments. Example: 1:20 to 1:30"
     },
+    "CopiedExclamation": {
+        "message": "Copied!",
+        "description": "Used after something has been copied to the clipboard. Example: 'Copied!'"
+    },
     "generic_guideline1": {
         "message": "Include segue transitions"
     },
@@ -696,6 +721,21 @@
     "category_poi_highlight_guideline3": {
         "message": "Can skip to the title or thumbnail"
     },
+    "category_chapter": {
+        "message": "Chapter"
+    },
+    "category_chapter_description": {
+        "message": "Custom named chapters describing major sections of a video."
+    },
+    "category_chapter_guideline1": {
+        "message": "Don't mention sponsor brand names"
+    },
+    "category_chapter_guideline2": {
+        "message": "Use larger chapters for general sections"
+    },
+    "category_chapter_guideline3": {
+        "message": "Smaller chapters can be placed inside larger ones"
+    },
     "category_livestream_messages": {
         "message": "Livestream: Donation/Message Readings"
     },
@@ -725,6 +765,9 @@
     },
     "showOverlay_full": {
         "message": "Show Label"
+    },
+    "showOverlay_chapter": {
+        "message": "Show Chapters"
     },
     "autoSkipOnMusicVideos": {
         "message": "Auto skip all segments when there is a non-music segment"
@@ -781,6 +824,10 @@
     "bracketEnd": {
         "message": "(End)"
     },
+    "End": {
+        "message": "End",
+        "description": "Button that skips to the end of a segment"
+    },
     "hiddenDueToDownvote": {
         "message": "hidden: downvote"
     },
@@ -821,6 +868,13 @@
     "downvoteDescription": {
         "message": "Incorrect/Wrong Timing"
     },
+    "incorrectVote": {
+        "message": "Incorrect"
+    },
+    "harmfulVote": {
+        "message": "Harmful",
+        "description": "Used for chapter segments when the text is harmful/offensive to remove it faster"
+    },
     "incorrectCategory": {
         "message": "Change Category"
     },
@@ -855,6 +909,9 @@
     },
     "categoryPillTitleText": {
         "message": "This entire video is labeled as this category and is too tightly integrated to be able to separate"
+    },
+    "chapterNameTooltipWarning": {
+        "message": "One of your chapter names is similar to a category. You should use categories when possible instead."
     },
     "experiementOptOut": {
         "message": "Opt-out of all future experiments",
@@ -1039,5 +1096,117 @@
     },
     "confirmResetToDefault": {
         "message": "Are you sure you want to reset all settings to their default values? This cannot be undone."
+    },
+    "exportSegments": {
+        "message": "Export segments"
+    },
+    "importSegments": {
+        "message": "Import chapters"
+    },
+    "Import": {
+        "message": "Import",
+        "description": "Button to initiate importing segments. Appears under the textbox where they paste in the data"
+    },
+    "redeemSuccess": {
+        "message": "Redeem Successful!"
+    },
+    "redeemFailed": {
+        "message": "License key is invalid"
+    },
+    "hideUpsells": {
+        "message": "Hide options not available without extra payment"
+    },
+    "chooseACountry": {
+        "message": "Choose a country"
+    },
+    "noDiscount": {
+        "message": "You do not qualify for a discount"
+    },
+    "discountLink": {
+        "message": "Discount Link (See the pink price)"
+    },
+    "selectYourCountry": {
+        "message": "Select your country"
+    },
+    "alreadyDonated": {
+        "message": "If you've donated any amount before now, you may redeem free access by emailing:",
+        "description": "After the colon is an email address"
+    },
+    "cantAfford": {
+        "message": "If you can't afford to purchase a license, click {here} to see if you are eligible for a discount",
+        "description": "Keep the curly braces"
+    },
+    "patreonSignIn": {
+        "message": "Sign in with Patreon"
+    },
+    "redeem": {
+        "message": "Redeem"
+    },
+    "joinOnPatreon": {
+        "message": "Subscribe on Patreon"
+    },
+    "oneTimePurchase": {
+        "message": "One Time Purchase"
+    },
+    "enterLicenseKey": {
+        "message": "Enter License Key"
+    },
+    "chaptersPage1": {
+        "message": "SponsorBlock crowd-sourced chapters feature is only available to people who purchase a license, or for people who are granted access for free due their past contributions"
+    },
+    "unsubmittedSegmentCounts": {
+        "message": "You currently have {0} on {1}",
+        "description": "Example: You currently have 12 unsubmitted segments on 5 videos"
+    },
+    "unsubmittedSegmentCountsZero": {
+        "message": "You currently have no unsubmitted segments",
+        "description": "Replaces 'unsubmittedSegmentCounts' string when there are no unsubmitted segments"
+    },
+    "unsubmittedSegmentsSingular": {
+        "message": "unsubmitted segment",
+        "description": "Example: You currently have 1 *unsubmitted segment* on 1 video"
+    },
+    "unsubmittedSegmentsPlural": {
+        "message": "unsubmitted segments",
+        "description": "Example: You currently have 12 *unsubmitted segments* on 5 videos"
+    },
+    "videosSingular": {
+        "message": "video",
+        "description": "Example: You currently have 3 unsubmitted segments on 1 *video*"
+    },
+    "videosPlural": {
+        "message": "videos",
+        "description": "Example: You currently have 12 unsubmitted segments on 5 *videos*"
+    },
+    "clearUnsubmittedSegments": {
+        "message": "Clear all segments",
+        "description": "Label for a button in settings"
+    },
+    "clearUnsubmittedSegmentsConfirm": {
+        "message": "Are you sure you want to clear all your unsubmitted segments?",
+        "description": "Confirmation message for the Clear unsubmitted segments button"
+    },
+    "showUnsubmittedSegments": {
+        "message": "Show segments",
+        "description": "Show/hide button for the unsubmitted segments list"
+    },
+    "hideUnsubmittedSegments": {
+        "message": "Hide segments",
+        "description": "Show/hide button for the unsubmitted segments list"
+    },
+    "videoID": {
+        "message": "Video ID",
+        "description": "Header of the unsubmitted segments list"
+    },
+    "segmentCount": {
+        "message": "Segment Count",
+        "description": "Header of the unsubmitted segments list"
+    },
+    "actions": {
+        "message": "Actions",
+        "description": "Header of the unsubmitted segments list"
+    },
+    "exportSegmentsAsURL": {
+        "message": "Share as URL"
     }
 }
