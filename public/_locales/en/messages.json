@@ -467,7 +467,7 @@
         "message": "Use manual skip when a full video label exists"
     },
     "whatManualSkipOnFullVideo": {
-        "message": "For people who want to watch the video uninteruppted if it is fully sponsored or self promotion."
+        "message": "For people who want to watch the video uninterrupted if it is fully sponsored or self promotion."
     },
     "skipNoticeDuration": {
         "message": "Skip notice duration (seconds):"
@@ -1140,7 +1140,7 @@
     },
     "cantAfford": {
         "message": "If you can't afford to purchase a license, click {here} to see if you are eligible for a discount",
-        "description": "Keep the curly braces"
+        "description": "Keep the curly braces. The word 'here' should be translated as well."
     },
     "patreonSignIn": {
         "message": "Sign in with Patreon"
