@@ -53,6 +53,7 @@ class PreviewBar {
     chapterVote: ChapterVote;
     originalChapterBar: HTMLElement;
     originalChapterBarBlocks: NodeListOf<HTMLElement>;
+    chapterMargin: number;
 
     constructor(parent: HTMLElement, onMobileYouTube: boolean, onInvidious: boolean, chapterVote: ChapterVote, test=false) {
         if (test) return;
@@ -236,9 +237,15 @@ class PreviewBar {
         this.clear();
         if (!this.segments) return;
 
+        this.chapterMargin = 2;
         if (this.originalChapterBar) {
             this.originalChapterBarBlocks = this.originalChapterBar.querySelectorAll(":scope > div") as NodeListOf<HTMLElement>
             this.existingChapters = this.segments.filter((s) => s.source === SponsorSourceType.YouTube).sort((a, b) => a.segment[0] - b.segment[0]);
+        
+            if (this.existingChapters?.length > 0) {
+                const margin = parseFloat(this.originalChapterBarBlocks?.[0]?.style?.marginRight?.replace("px", ""));
+                if (margin) this.chapterMargin = margin;
+            }
         }
 
         const sortedSegments = this.segments.sort(({ segment: a }, { segment: b }) => {
@@ -281,7 +288,8 @@ class PreviewBar {
         bar.style.position = "absolute";
         const duration = Math.min(segment[1], this.videoDuration) - segment[0];
         if (duration > 0) {
-            bar.style.width = `calc(${this.intervalToPercentage(segment[0], segment[1])}${this.chapterFilter(barSegment) ? ' - 2px' : ''})`;
+            bar.style.width = `calc(${this.intervalToPercentage(segment[0], segment[1])}${
+                this.chapterFilter(barSegment) && segment[1] < this.videoDuration ? ` - ${this.chapterMargin}px` : ''})`;
         }
         
         const time = segment[1] ? Math.min(this.videoDuration, segment[0]) : segment[0];
@@ -305,6 +313,12 @@ class PreviewBar {
         // Merge overlapping chapters
         const filteredSegments = segments?.filter((segment) => this.chapterFilter(segment));
         const chaptersToRender = this.createChapterRenderGroups(filteredSegments).filter((segment) => this.chapterGroupFilter(segment));
+        // Fix missing sections due to filtered segments
+        for (let i = 1; i < chaptersToRender.length; i++) {
+            if (chaptersToRender[i].segment[0] !== chaptersToRender[i - 1].segment[1]) {
+                chaptersToRender[i - 1].segment[1] = chaptersToRender[i].segment[0]
+            }
+        }
 
         if (chaptersToRender?.length <= 0) {
             if (this.customChaptersBar) this.customChaptersBar.style.display = "none";
@@ -455,8 +469,8 @@ class PreviewBar {
     private setupChapterSection(section: HTMLElement, startTime: number, endTime: number, addMargin: boolean): void {
         const sizePercent = this.intervalToPercentage(startTime, endTime);
         if (addMargin) {
-            section.style.marginRight = "2px";
-            section.style.width = `calc(${sizePercent} - 2px)`;
+            section.style.marginRight = `${this.chapterMargin}px`;
+            section.style.width = `calc(${sizePercent} - ${this.chapterMargin}px)`;
         } else {
             section.style.marginRight = "0";
             section.style.width = sizePercent;
@@ -533,7 +547,7 @@ class PreviewBar {
                 const section = sections[i];
 
                 const sectionWidthDecimal = parseFloat(section.getAttribute("decimal-width"));
-                const sectionWidthDecimalNoMargin = sectionWidthDecimal - 2 / progressBar.clientWidth;
+                const sectionWidthDecimalNoMargin = sectionWidthDecimal - this.chapterMargin / progressBar.clientWidth;
 
                 for (const className in changes) {
                     const selector = `.${className}`
@@ -576,6 +590,7 @@ class PreviewBar {
             { left: number, scale: number } {
         const sections = currentElement.parentElement.parentElement.parentElement.children;
         let currentWidth = 0;
+        let lastWidth = 0;
 
         let left = 0;
         let leftPosition = 0;
@@ -583,6 +598,7 @@ class PreviewBar {
         let scale = null;
         let scalePosition = 0;
         let scaleWidth = 0;
+        let lastScalePosition = 0;
 
         for (let i = 0; i < sections.length; i++) {
             const section = sections[i] as HTMLElement;
@@ -602,24 +618,33 @@ class PreviewBar {
             const transformMatch = checkElement.style.transform.match(/scaleX\(([0-9.]+?)\)/);
             if (transformMatch) {
                 const transformScale = parseFloat(transformMatch[1]);
-                if (i === sections.length - 1 || (transformScale < 1 && transformScale + checkLeft / currentSectionWidthNoMargin < 0.99999)) {
-                    scale = transformScale;
-                    scaleWidth = currentSectionWidthNoMargin;
+                const endPosition = transformScale + checkLeft / currentSectionWidthNoMargin;
 
-                    if (transformScale > 0) {
-                        // reached the end of this section for sure, since the scale is now between 0 and 1
-                        // if the scale is always zero, then it will go through all sections but still return 0
+                if (lastScalePosition > 0.99999 && endPosition === 0) {
+                    // Last one was an end section that was fully filled
+                    scalePosition = currentWidth - lastWidth;
+                    break;
+                }
 
-                        scalePosition = currentWidth;
-                        if (checkLeft !== 0) {
-                            scalePosition += left;
-                        }
-                        break;
+                lastScalePosition = endPosition;
+
+                scale = transformScale;
+                scaleWidth = currentSectionWidthNoMargin;
+
+                if ((i === sections.length - 1 || endPosition < 0.99999) && endPosition > 0) {
+                    // reached the end of this section for sure
+                    // if the scale is always zero, then it will go through all sections but still return 0
+
+                    scalePosition = currentWidth;
+                    if (checkLeft !== 0) {
+                        scalePosition += left;
                     }
+                    break;
                 }
             }
 
-            currentWidth += currentSectionWidth;
+            lastWidth = currentSectionWidth;
+            currentWidth += lastWidth;
         }
 
         return { 
@@ -657,8 +682,6 @@ class PreviewBar {
         const chaptersContainer = document.querySelector(".ytp-chapter-container") as HTMLDivElement;
 
         if (chaptersContainer) {
-            // TODO: Check if existing chapters exist (if big chapters menu is available?)
-
             if (segments.length > 0) {
                 chaptersContainer.style.removeProperty("display");
 
@@ -696,7 +719,6 @@ class PreviewBar {
                     this.chapterVote.setVisibility(false);
                 }
             } else {
-                // Hide chapters menu again
                 chaptersContainer.style.display = "none";
                 this.chapterVote.setVisibility(false);
             }
