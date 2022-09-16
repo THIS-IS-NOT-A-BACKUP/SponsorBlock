@@ -34,7 +34,7 @@
 	height: 3px;
 }
 
-#previewbar.hovered {
+div:hover > #previewbar.sbNotInvidious {
 	transform: scaleY(1)
 }
 
@@ -130,7 +130,7 @@ div:hover > .sponsorBlockChapterBar {
 	vertical-align: top;
 }
 
-.playerButton.hidden {
+.playerButton.hidden:not(.autoHiding) {
 	display: none !important;
 }
 

@@ -28,7 +28,8 @@ export interface PreviewBarSegment {
 }
 
 interface ChapterGroup extends SegmentContainer {
-    originalDuration: number 
+    originalDuration: number;
+    actionType: ActionType;
 }
 
 class PreviewBar {
@@ -54,6 +55,8 @@ class PreviewBar {
     originalChapterBar: HTMLElement;
     originalChapterBarBlocks: NodeListOf<HTMLElement>;
     chapterMargin: number;
+    unfilteredChapterGroups: ChapterGroup[];
+    chapterGroups: ChapterGroup[];
 
     constructor(parent: HTMLElement, onMobileYouTube: boolean, onInvidious: boolean, chapterVote: ChapterVote, test=false) {
         if (test) return;
@@ -196,10 +199,7 @@ class PreviewBar {
 
             this.container.style.transform = "none";
         } else if (!this.onInvidious) {
-            // Hover listener
-            this.parent.addEventListener("mouseenter", () => this.container.classList.add("hovered"));
-
-            this.parent.addEventListener("mouseleave", () => this.container.classList.remove("hovered"));
+            this.container.classList.add("sbNotInvidious");
         }
 
         // On the seek bar
@@ -311,29 +311,37 @@ class PreviewBar {
             return;
         }
 
+        // Merge overlapping chapters
+        this.unfilteredChapterGroups = this.createChapterRenderGroups(segments);
+
         if (segments.every((segments) => segments.source === SponsorSourceType.YouTube) 
             || (!Config.config.renderSegmentsAsChapters 
                 && segments.every((segment) => segment.actionType !== ActionType.Chapter 
-                    || segment.source === SponsorSourceType.YouTube))) {
+                    || segment.source === SponsorSourceType.YouTube))
+            || this.chapterGroups?.length <= 0) {
             if (this.customChaptersBar) this.customChaptersBar.style.display = "none";
             this.originalChapterBar.style.removeProperty("display");
             return;
         }
 
-        // Merge overlapping chapters
         const filteredSegments = segments?.filter((segment) => this.chapterFilter(segment));
-        const chaptersToRender = this.createChapterRenderGroups(filteredSegments).filter((segment) => this.chapterGroupFilter(segment));
-        // Fix missing sections due to filtered segments
-        for (let i = 1; i < chaptersToRender.length; i++) {
-            if (chaptersToRender[i].segment[0] !== chaptersToRender[i - 1].segment[1]) {
-                chaptersToRender[i - 1].segment[1] = chaptersToRender[i].segment[0]
+        if (filteredSegments) {
+            let groups = this.unfilteredChapterGroups;
+            if (filteredSegments.length !== segments.length) {
+                groups = this.createChapterRenderGroups(filteredSegments);
             }
-        }
+            this.chapterGroups = groups.filter((segment) => this.chapterGroupFilter(segment));
 
-        if (chaptersToRender?.length <= 0) {
-            if (this.customChaptersBar) this.customChaptersBar.style.display = "none";
-            this.originalChapterBar.style.removeProperty("display");
-            return;
+            if (groups.length !== this.chapterGroups.length) {
+                // Fix missing sections due to filtered segments
+                for (let i = 1; i < this.chapterGroups.length; i++) {
+                    if (this.chapterGroups[i].segment[0] !== this.chapterGroups[i - 1].segment[1]) {
+                        this.chapterGroups[i - 1].segment[1] = this.chapterGroups[i].segment[0]
+                    }
+                }
+            }
+        } else {
+            this.chapterGroups = this.unfilteredChapterGroups;
         }
 
         // Create it from cloning
@@ -352,24 +360,26 @@ class PreviewBar {
         const originalSection = originalSections[0];
 
         // For switching to a video with less chapters
-        if (originalSections.length > chaptersToRender.length) {
-            for (let i = originalSections.length - 1; i >= chaptersToRender.length; i--) {
+        if (originalSections.length > this.chapterGroups.length) {
+            for (let i = originalSections.length - 1; i >= this.chapterGroups.length; i--) {
                 this.customChaptersBar.removeChild(originalSections[i]);
             }
         }
 
         // Modify it to have sections for each segment
-        for (let i = 0; i < chaptersToRender.length; i++) {
-            const chapter = chaptersToRender[i].segment;
+        for (let i = 0; i < this.chapterGroups.length; i++) {
+            const chapter = this.chapterGroups[i].segment;
             let newSection = originalSections[i] as HTMLElement;
             if (!newSection) {
                 newSection = originalSection.cloneNode(true) as HTMLElement;
 
                 this.firstTimeSetupChapterSection(newSection);
                 this.customChaptersBar.appendChild(newSection);
+            } else if (createFromScratch) {
+                this.firstTimeSetupChapterSection(newSection);
             }
 
-            this.setupChapterSection(newSection, chapter[0], chapter[1], i !== chaptersToRender.length - 1);
+            this.setupChapterSection(newSection, chapter[0], chapter[1], i !== this.chapterGroups.length - 1);
         }
 
         // Hide old bar
@@ -411,15 +421,19 @@ class PreviewBar {
                         latestValidChapter = result[result.length - 1];
                     }
 
+                    const priorityActionType = this.getActionTypePrioritized([segment.actionType, latestChapter?.actionType]);
+
                     // Split the latest chapter if smaller
                     result.push({
                         segment: [segment.segment[0], segment.segment[1]],
                         originalDuration: segmentDuration,
+                        actionType: priorityActionType
                     });
                     if (latestValidChapter?.segment[1] > segment.segment[1]) {
                         result.push({
                             segment: [segment.segment[1], latestValidChapter.segment[1]],
-                            originalDuration: latestValidChapter.originalDuration
+                            originalDuration: latestValidChapter.originalDuration,
+                            actionType: latestValidChapter.actionType
                         });
                     }
 
@@ -438,7 +452,8 @@ class PreviewBar {
                     // Start at end of old one otherwise
                     result.push({
                         segment: [latestChapter.segment[1], segment.segment[1]],
-                        originalDuration: segmentDuration
+                        originalDuration: segmentDuration,
+                        actionType: segment.actionType
                     });
                 }
             } else {
@@ -447,7 +462,8 @@ class PreviewBar {
                 if (segment.segment[0] > lastTime) {
                     result.push({
                         segment: [lastTime, segment.segment[0]],
-                        originalDuration: 0
+                        originalDuration: 0,
+                        actionType: null
                     });
                 }
 
@@ -455,7 +471,8 @@ class PreviewBar {
                 const endTime = Math.min(segment.segment[1], this.videoDuration);
                 result.push({
                     segment: [segment.segment[0], endTime],
-                    originalDuration: endTime - segment.segment[0]
+                    originalDuration: endTime - segment.segment[0],
+                    actionType: segment.actionType
                 });
             }
 
@@ -467,13 +484,24 @@ class PreviewBar {
                 if (this.intervalToDecimal(lastTime, nextTime) > MIN_CHAPTER_SIZE) {
                     result.push({
                         segment: [lastTime, nextTime],
-                        originalDuration: 0
+                        originalDuration: 0,
+                        actionType: null
                     });
                 }
             }
         });
 
         return result;
+    }
+
+    private getActionTypePrioritized(actionTypes: ActionType[]): ActionType {
+        if (actionTypes.includes(ActionType.Skip)) {
+            return ActionType.Skip;
+        } else if (actionTypes.includes(ActionType.Mute)) {
+            return ActionType.Mute;
+        } else {
+            return actionTypes.find(a => a) ?? actionTypes[0];
+        }
     }
 
     private setupChapterSection(section: HTMLElement, startTime: number, endTime: number, addMargin: boolean): void {
