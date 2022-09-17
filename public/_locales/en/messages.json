@@ -246,6 +246,12 @@
     "whatRefetchWhenNotFound": {
         "message": "If the video is new, and there are no segments found, it will keep refetching every few minutes while you watch."
     },
+    "enableShowCategoryWithoutPermission": {
+        "message": "Show categories in submission menu even without submission permission"
+    },
+    "whatShowCategoryWithoutPermission": {
+        "message": "Some categories require permission to submit due to minimum reputation requirements"
+    },
     "showNotice": {
         "message": "Show Notice Again"
     },
@@ -1159,6 +1165,10 @@
     },
     "chaptersPage1": {
         "message": "SponsorBlock crowd-sourced chapters feature is only available to people who purchase a license, or for people who are granted access for free due their past contributions"
+    },
+    "chaptersPage2": {
+        "message": "Note: Permission to submit chapters is still based on calculated reputation. Purchasing a license only allows you to view chapters submitted by others",
+        "description": "On the chapters page for getting access to the paid chapters feature"
     },
     "unsubmittedSegmentCounts": {
         "message": "You currently have {0} on {1}",
