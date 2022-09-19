@@ -9,7 +9,7 @@ import Config from "../config";
 import { ChapterVote } from "../render/ChapterVote";
 import { ActionType, Category, SegmentContainer, SponsorHideType, SponsorSourceType, SponsorTime } from "../types";
 import { partition } from "../utils/arrayUtils";
-import { shortCategoryName } from "../utils/categoryUtils";
+import { DEFAULT_CATEGORY, shortCategoryName } from "../utils/categoryUtils";
 import { GenericUtils } from "../utils/genericUtils";
 import { findValidElement } from "../utils/pageUtils";
 
@@ -93,7 +93,7 @@ class PreviewBar {
 
         // Grab the tooltip from the text wrapper as the tooltip doesn't have its classes on init
         this.categoryTooltipContainer = tooltipTextWrapper.parentElement;
-        const titleTooltip = tooltipTextWrapper.querySelector(".ytp-tooltip-title");
+        const titleTooltip = tooltipTextWrapper.querySelector(".ytp-tooltip-title") as HTMLElement;
         if (!this.categoryTooltipContainer || !titleTooltip) return;
 
         tooltipTextWrapper.insertBefore(this.categoryTooltip, titleTooltip.nextSibling);
@@ -164,6 +164,10 @@ class PreviewBar {
                 // Used to prevent overlapping
                 this.categoryTooltip.classList.toggle("ytp-tooltip-text-no-title", noYoutubeChapters);
                 this.chapterTooltip.classList.toggle("ytp-tooltip-text-no-title", noYoutubeChapters);
+
+                // To prevent offset issue
+                this.categoryTooltip.style.right = titleTooltip.style.right;
+                this.chapterTooltip.style.right = titleTooltip.style.right;
             }
         });
 
@@ -318,8 +322,7 @@ class PreviewBar {
         if (segments.every((segments) => segments.source === SponsorSourceType.YouTube) 
             || (!Config.config.renderSegmentsAsChapters 
                 && segments.every((segment) => segment.actionType !== ActionType.Chapter 
-                    || segment.source === SponsorSourceType.YouTube))
-            || this.chapterGroups?.length <= 0) {
+                    || segment.source === SponsorSourceType.YouTube))) {
             if (this.customChaptersBar) this.customChaptersBar.style.display = "none";
             this.originalChapterBar.style.removeProperty("display");
             return;
@@ -343,6 +346,12 @@ class PreviewBar {
             }
         } else {
             this.chapterGroups = this.unfilteredChapterGroups;
+        }
+
+        if (!this.chapterGroups || this.chapterGroups.length <= 0) {
+            if (this.customChaptersBar) this.customChaptersBar.style.display = "none";
+            this.originalChapterBar.style.removeProperty("display");
+            return;
         }
 
         // Create it from cloning
@@ -702,13 +711,22 @@ class PreviewBar {
     }
 
     updateChapterText(segments: SponsorTime[], submittingSegments: SponsorTime[], currentTime: number): void {
-        if (!segments && submittingSegments?.length <= 0) return;
+        if ((!segments || segments.length <= 0) && submittingSegments?.length <= 0) {
+            const chaptersContainer = this.getChaptersContainer();
+            const chapterButton = this.getChapterButton(chaptersContainer);
+            if (chapterButton.classList.contains("ytp-chapter-container-disabled")) {
+                chaptersContainer.style.display = "none";
+            }
+
+            return;
+        }
 
         segments ??= [];
         if (submittingSegments?.length > 0) segments = segments.concat(submittingSegments);
         const activeSegments = segments.filter((segment) => {
             return segment.hidden === SponsorHideType.Visible 
-                && segment.segment[0] <= currentTime && segment.segment[1] > currentTime;
+                && segment.segment[0] <= currentTime && segment.segment[1] > currentTime
+                && segment.category !== DEFAULT_CATEGORY;
         });
 
         this.setActiveSegments(activeSegments);
@@ -718,7 +736,7 @@ class PreviewBar {
      * Adds the text to the chapters slot if not filled by default
      */
     private setActiveSegments(segments: SponsorTime[]): void {
-        const chaptersContainer = document.querySelector(".ytp-chapter-container") as HTMLDivElement;
+        const chaptersContainer = this.getChaptersContainer();
 
         if (chaptersContainer) {
             if (segments.length > 0) {
@@ -734,7 +752,7 @@ class PreviewBar {
                     }
                 })[0];
 
-                const chapterButton = chaptersContainer.querySelector("button.ytp-chapter-title") as HTMLButtonElement;
+                const chapterButton = this.getChapterButton(chaptersContainer);
                 chapterButton.classList.remove("ytp-chapter-container-disabled");
                 chapterButton.disabled = false;
 
@@ -762,6 +780,15 @@ class PreviewBar {
                 this.chapterVote.setVisibility(false);
             }
         }
+    }
+
+    private getChaptersContainer(): HTMLElement {
+        return document.querySelector(".ytp-chapter-container") as HTMLElement;
+    }
+
+    private getChapterButton(chaptersContainer: HTMLElement): HTMLButtonElement {
+        return (chaptersContainer ?? this.getChaptersContainer())
+            .querySelector("button.ytp-chapter-title") as HTMLButtonElement;
     }
 
     remove(): void {
