@@ -87,10 +87,10 @@
         "message": "No segments found"
     },
     "sponsorStart": {
-        "message": "Segment Starts Now"
+        "message": "Start Segment Now"
     },
     "sponsorEnd": {
-        "message": "Segment Ends Now"
+        "message": "End Segment Now"
     },
     "sponsorCancel": {
         "message": "Cancel Creating Segment"
@@ -415,16 +415,16 @@
         "message": "Check status.sponsor.ajay.app for server status."
     },
     "changeUserID": {
-        "message": "Import/Export Your UserID"
+        "message": "Import/Export Your Private UserID"
     },
     "whatChangeUserID": {
         "message": "This should be kept private. This is like a password and should not be shared with anyone. If someone has this, they can impersonate you. If you are looking for your public userID, click the clipboard icon in the popup."
     },
     "setUserID": {
-        "message": "Set UserID"
+        "message": "Set Private UserID"
     },
     "userIDChangeWarning": {
-        "message": "Warning: Changing the UserID is permanent. Are you sure you would like to do this? Make sure to backup your old one just in case."
+        "message": "Warning: Changing the Private UserID is permanent. Are you sure you would like to do this? Make sure to backup your old one just in case."
     },
     "createdBy": {
         "message": "Created By"
@@ -524,7 +524,7 @@
         "message": "Load from file"
     },
     "whatExportOptions": {
-        "message": "This is your entire configuration in JSON. This includes your userID, so be sure to share this wisely."
+        "message": "This is your entire configuration in JSON. This includes your Private UserID, so be sure to share this wisely."
     },
     "setOptions": {
         "message": "Set Options"
@@ -689,7 +689,7 @@
         "message": "Filler Tangent/Jokes"
     },
     "category_filler_description": {
-        "message": "Tangential scenes added only for filler or humor that are not required to understand the main content of the video. This should not include segments providing context or background details."
+        "message": "Tangential scenes added only for filler or humor that are not required to understand the main content of the video. This should not include segments providing context or background details. This is a very aggressive category meant for when you aren't in the mood for \"fun\"."
     },
     "category_filler_short": {
         "message": "Filler"
@@ -1173,6 +1173,9 @@
     "chapterNewFeature": {
         "message": "New Feature: Crowd-sourced custom chapters. These are custom-named sections in videos that can be stacked to get more and more precise. Purchase a license to view the chapters submitted on this video such as: ",
         "description": "After the comma, a list of chapters for this video will appear"
+    },
+    "chapterNewFeature2": {
+        "message": "New Feature: Crowd-sourced custom chapters. These are custom-named sections in videos that can be stacked to get more and more precise. You have access for free, enable in options."
     },
     "unsubmittedSegmentCounts": {
         "message": "You currently have {0} on {1}",

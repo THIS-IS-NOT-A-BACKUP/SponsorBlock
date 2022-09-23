@@ -421,13 +421,16 @@ async function runThePopup(messageListener?: MessageListener): Promise<void> {
             if (request.found) {
                 PageElements.videoFound.innerHTML = chrome.i18n.getMessage("sponsorFound");
 
+                PageElements.issueReporterImportExport.classList.remove("hidden");
                 if (request.sponsorTimes) {
                     displayDownloadedSponsorTimes(request.sponsorTimes, request.time);
                 }
             } else if (request.status == 404 || request.status == 200) {
                 PageElements.videoFound.innerHTML = chrome.i18n.getMessage("sponsor404");
+                PageElements.issueReporterImportExport.classList.add("hidden");
             } else {
                 PageElements.videoFound.innerHTML = chrome.i18n.getMessage("connectionError") + request.status;
+                PageElements.issueReporterImportExport.classList.add("hidden");
             }
         }
 
@@ -502,7 +505,13 @@ async function runThePopup(messageListener?: MessageListener): Promise<void> {
             PageElements.issueReporterTabs.classList.add("hidden");
             currentSegmentTab = SegmentTab.Segments;
         } else {
-            PageElements.issueReporterTabs.classList.remove("hidden");
+            if (currentSegmentTab === SegmentTab.Segments 
+                    && sponsorTimes.every((segment) => segment.actionType === ActionType.Chapter)) {
+                PageElements.issueReporterTabs.classList.add("hidden");
+                currentSegmentTab = SegmentTab.Chapters;
+            } else {
+                PageElements.issueReporterTabs.classList.remove("hidden");
+            }
         }
 
         // Sort list by start time

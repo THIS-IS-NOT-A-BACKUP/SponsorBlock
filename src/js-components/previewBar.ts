@@ -234,19 +234,24 @@ class PreviewBar {
         const allProgressBars = document.querySelectorAll('.ytp-progress-bar') as NodeListOf<HTMLElement>;
         this.progressBar = findValidElement(allProgressBars) ?? allProgressBars?.[0];
 
-        const newChapterBar = this.progressBar.querySelector(".ytp-chapters-container:not(.sponsorBlockChapterBar)") as HTMLElement;
-        if (this.originalChapterBar !== newChapterBar) {
-            // Make sure changes are undone on old bar
-            this.originalChapterBar?.style?.removeProperty("display");
+        if (this.progressBar) {
+            const newChapterBar = this.progressBar.querySelector(".ytp-chapters-container:not(.sponsorBlockChapterBar)") as HTMLElement;
+            if (this.originalChapterBar !== newChapterBar) {
+                // Make sure changes are undone on old bar
+                this.originalChapterBar?.style?.removeProperty("display");
 
-            this.originalChapterBar = newChapterBar;
+                this.originalChapterBar = newChapterBar;
+            }
         }
-        
     }
 
     private update(): void {
         this.clear();
-        if (!this.segments) return;
+        const chapterChevron = this.getChapterChevron();
+
+        if (!this.segments) {
+            chapterChevron?.style?.removeProperty("display");
+        }
 
         this.chapterMargin = 2;
         if (this.originalChapterBar) {
@@ -271,10 +276,8 @@ class PreviewBar {
 
         this.createChaptersBar(this.segments.sort((a, b) => a.segment[0] - b.segment[0]));
 
-        const chapterChevron = this.getChapterChevron();
         if (chapterChevron) {
-            if (this.segments.some((segment) => segment.actionType !== ActionType.Chapter 
-                && segment.source === SponsorSourceType.YouTube)) {
+            if (this.segments.some((segment) => segment.source === SponsorSourceType.YouTube)) {
                 chapterChevron.style.removeProperty("display");
             } else {
                 chapterChevron.style.display = "none";
@@ -311,8 +314,11 @@ class PreviewBar {
 
     createChaptersBar(segments: PreviewBarSegment[]): void {
         if (!this.progressBar || !this.originalChapterBar || this.originalChapterBar.childElementCount <= 0) {
-            if (this.customChaptersBar) this.customChaptersBar.style.display = "none";
             if (this.originalChapterBar) this.originalChapterBar.style.removeProperty("display");
+
+            // Make sure other video types lose their chapter bar
+            document.querySelectorAll(".sponsorBlockChapterBar").forEach((element) => element.remove());
+            this.customChaptersBar = null;
             return;
         }
 
