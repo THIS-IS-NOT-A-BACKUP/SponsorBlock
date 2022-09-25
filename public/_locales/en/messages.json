@@ -35,6 +35,9 @@
         "message": "Render segments as chapters",
         "description": "Refers to drawing segments on the YouTube seek bar as split up chapters, similar to the existing chapter system"
     },
+    "showSegmentNameInChapterBar": {
+        "message": "Show Current Segment Beside Video Time"
+    },
     "upvoteButtonInfo": {
         "message": "Upvote this submission"
     },
@@ -121,6 +124,9 @@
     },
     "closePopup": {
         "message": "Close Popup"
+    },
+    "closeIcon": {
+        "message": "Close Icon"
     },
     "SubmitTimes": {
         "message": "Submit Segments"
@@ -1045,6 +1051,12 @@
     },
     "hideSegment": {
         "message": "Hide segment"
+    },
+    "skipSegment": {
+        "message": "Skip segment"
+    },
+    "playChapter": {
+        "message": "Play chapter"
     },
     "SponsorTimeEditScrollNewFeature": {
         "message": "Use your mousewheel while hovering over the edit box to quickly adjust the time. Combinations of the ctrl or shift key can be used to fine tune the changes."
