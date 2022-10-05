@@ -55,6 +55,7 @@ let sponsorVideoID: VideoID = null;
 // List of open skip notices
 const skipNotices: SkipNotice[] = [];
 let activeSkipKeybindElement: ToggleSkippable = null;
+let retryFetchTimeout: NodeJS.Timeout = null;
 
 // JSON video info
 let videoInfo: VideoInfo = null;
@@ -129,8 +130,9 @@ const playerButtons: Record<string, {button: HTMLButtonElement, image: HTMLImage
 // Direct Links after the config is loaded
 utils.wait(() => Config.config !== null, 1000, 1).then(() => videoIDChange(getYouTubeVideoID(document)));
 // wait for hover preview to appear, and refresh attachments if ever found
-utils.waitForElement(".ytp-inline-preview-ui").then(() => refreshVideoAttachments())
-utils.waitForElement("a.ytp-title-link[data-sessionlink='feature=player-title']").then(() => videoIDChange(getYouTubeVideoID(document)).then())
+utils.waitForElement(".ytp-inline-preview-ui").then(() => refreshVideoAttachments());
+utils.waitForElement("a.ytp-title-link[data-sessionlink='feature=player-title']")
+    .then(() => videoIDChange(getYouTubeVideoID(document)));
 addPageListeners();
 addHotkeyListener();
 
@@ -383,6 +385,8 @@ function resetValues() {
 }
 
 async function videoIDChange(id): Promise<void> {
+    // don't switch to invalid value
+    if (!id && sponsorVideoID && !document?.URL?.includes("youtube.com/clip/")) return;
     //if the id has not changed return unless the video element has changed
     if (sponsorVideoID === id && (isVisible(video) || !video)) return;
 
@@ -532,7 +536,7 @@ function durationChangeListener(): void {
 function videoOnReadyListener(): void {
     createPreviewBar();
     updatePreviewBar();
-    createButtons();
+    updateVisibilityOfPlayerControlsButton()
 }
 
 function cancelSponsorSchedule(): void {
@@ -1137,15 +1141,16 @@ function retryFetch(errorCode: number): void {
     if (!Config.config.refetchWhenNotFound) return;
     sponsorDataFound = false;
 
-    if (errorCode !== 404 && retryCount > 1) {
+    if (retryFetchTimeout) clearTimeout(retryFetchTimeout);
+    if ((errorCode !== 404 && retryCount > 1) || (errorCode !== 404 && retryCount > 10)) {
         // Too many errors (50x), give up
         return;
     }
 
     retryCount++;
 
-    const delay = errorCode === 404 ? (10000 + Math.random() * 30000) : (2000 + Math.random() * 10000);
-    setTimeout(() => {
+    const delay = errorCode === 404 ? (30000 + Math.random() * 30000) : (2000 + Math.random() * 10000);
+    retryFetchTimeout = setTimeout(() => {
         if (sponsorVideoID && sponsorTimes?.length === 0
                 || sponsorTimes.every((segment) => segment.source !== SponsorSourceType.Server)) {
             sponsorsLookup();
@@ -1221,7 +1226,7 @@ function getYouTubeVideoID(document: Document, url?: string): string | boolean {
     // clips should never skip, going from clip to full video has no indications.
     if (url.includes("youtube.com/clip/")) return false;
     // skip to document and don't hide if on /embed/
-    if (url.includes("/embed/") && url.includes("youtube.com")) return getYouTubeVideoIDFromDocument(false);
+    if (url.includes("/embed/") && url.includes("youtube.com")) return getYouTubeVideoIDFromDocument(false, PageType.Embed);
     // skip to URL if matches youtube watch or invidious or matches youtube pattern
     if ((!url.includes("youtube.com")) || url.includes("/watch") || url.includes("/shorts/") || url.includes("playlist")) return getYouTubeVideoIDFromURL(url);
     // skip to document if matches pattern
@@ -1231,8 +1236,10 @@ function getYouTubeVideoID(document: Document, url?: string): string | boolean {
 }
 
 function getYouTubeVideoIDFromDocument(hideIcon = true, pageHint = PageType.Watch): string | boolean {
+    const selector = "a.ytp-title-link[data-sessionlink='feature=player-title']";
     // get ID from document (channel trailer / embedded playlist)
-    const element = video?.parentElement?.parentElement?.querySelector("a.ytp-title-link[data-sessionlink='feature=player-title']");
+    const element = pageHint === PageType.Embed ? document.querySelector(selector) 
+        : video?.parentElement?.parentElement?.querySelector(selector);
     const videoURL = element?.getAttribute("href");
     if (videoURL) {
         onInvidious = hideIcon;
@@ -1757,16 +1764,14 @@ function shouldSkip(segment: SponsorTime): boolean {
 
 /** Creates any missing buttons on the YouTube player if possible. */
 async function createButtons(): Promise<void> {
-    if (onMobileYouTube) return;
-
     controls = await utils.wait(getControls).catch();
 
     // Add button if does not already exist in html
     createButton("startSegment", "sponsorStart", () => startOrEndTimingNewSegment(), "PlayerStartIconSponsorBlocker.svg");
     createButton("cancelSegment", "sponsorCancel", () => cancelCreatingSegment(), "PlayerCancelSegmentIconSponsorBlocker.svg");
     createButton("delete", "clearTimes", () => clearSponsorTimes(), "PlayerDeleteIconSponsorBlocker.svg");
-    createButton("submit", "SubmitTimes", submitSponsorTimes, "PlayerUploadIconSponsorBlocker.svg");
-    createButton("info", "openPopup", openInfoMenu, "PlayerInfoIconSponsorBlocker.svg");
+    createButton("submit", "SubmitTimes", () => submitSponsorTimes(), "PlayerUploadIconSponsorBlocker.svg");
+    createButton("info", "openPopup", () => openInfoMenu(), "PlayerInfoIconSponsorBlocker.svg");
 
     const controlsContainer = getControls();
     if (Config.config.autoHideInfoButton && !onInvidious && controlsContainer
@@ -2253,7 +2258,8 @@ function getSegmentsMessage(sponsorTimes: SponsorTime[]): string {
 function windowListenerHandler(event: MessageEvent): void {
     const data = event.data;
     const dataType = data.type;
-    if (data.source !== "sponsorblock") return;
+
+    if (data.source !== "sponsorblock" || document?.URL?.includes("youtube.com/clip/")) return;
 
     if (dataType === "navigation" && data.videoID) {
         pageType = data.pageType;
