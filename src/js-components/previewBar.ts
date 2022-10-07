@@ -217,6 +217,13 @@ class PreviewBar {
 
         if (this.customChaptersBar) this.customChaptersBar.style.display = "none";
         this.originalChapterBar?.style?.removeProperty("display");
+        this.chapterVote?.setVisibility(false);
+
+        document.querySelectorAll(`.sponsorBlockChapterBar`).forEach((e) => {
+            if (e !== this.customChaptersBar) {
+                e.remove();
+            }
+        });
     }
 
     set(segments: PreviewBarSegment[], videoDuration: number): void {
@@ -770,8 +777,8 @@ class PreviewBar {
                 const chapterTitle = chaptersContainer.querySelector(".ytp-chapter-title-content") as HTMLDivElement;
                 chapterTitle.innerText = chosenSegment.description || shortCategoryName(chosenSegment.category);
 
-                const chapterVoteContainer = this.chapterVote.getContainer();
                 if (chosenSegment.source === SponsorSourceType.Server) {
+                    const chapterVoteContainer = this.chapterVote.getContainer();
                     if (!chapterButton.contains(chapterVoteContainer)) {
                         const oldVoteContainers = document.querySelectorAll("#chapterVote");
                         if (oldVoteContainers.length > 0) {
