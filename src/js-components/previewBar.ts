@@ -740,11 +740,11 @@ class PreviewBar {
                 || ((!segments || segments.length <= 0) && submittingSegments?.length <= 0)) {
             const chaptersContainer = this.getChaptersContainer();
             const chapterButton = this.getChapterButton(chaptersContainer);
-            if (chapterButton.classList.contains("ytp-chapter-container-disabled")) {
+            if (chapterButton && chapterButton.classList.contains("ytp-chapter-container-disabled")) {
                 chaptersContainer.style.display = "none";
             }
 
-            return;
+            return [];
         }
 
         segments ??= [];
@@ -820,7 +820,7 @@ class PreviewBar {
 
     private getChapterButton(chaptersContainer: HTMLElement): HTMLButtonElement {
         return (chaptersContainer ?? this.getChaptersContainer())
-            .querySelector("button.ytp-chapter-title") as HTMLButtonElement;
+            ?.querySelector("button.ytp-chapter-title") as HTMLButtonElement;
     }
 
     remove(): void {

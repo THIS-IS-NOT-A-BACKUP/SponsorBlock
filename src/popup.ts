@@ -67,9 +67,11 @@ class MessageHandler {
 
 // To prevent clickjacking
 let allowPopup = window === window.top;
-window.addEventListener("message", async (e) => {
+window.addEventListener("message", async (e): Promise<void> => {
     if (e.source !== window.parent) return;
-    if (e.origin.endsWith('.youtube.com')) return allowPopup = true;
+    if (e.origin.endsWith('.youtube.com')) {
+        allowPopup = true;
+    }
 });
 
 //make this a function to allow this to run on the content page
@@ -281,7 +283,7 @@ async function runThePopup(messageListener?: MessageListener): Promise<void> {
     if (!Config.config.payments.freeAccess && !noRefreshFetchingChaptersAllowed()) values.push("freeChaptersAccess");
 
     utils.asyncRequestToServer("GET", "/api/userInfo", {
-        userID: Config.config.userID,
+        publicUserID: await utils.getHash(Config.config.userID),
         values
     }).then((res) => {
         if (res.status === 200) {
@@ -461,7 +463,7 @@ async function runThePopup(messageListener?: MessageListener): Promise<void> {
                 } else {
                     PageElements.videoFound.innerHTML = chrome.i18n.getMessage("segmentsStillLoading");
                 }
-                
+
                 PageElements.issueReporterImportExport.classList.remove("hidden");
             }
         }
@@ -614,6 +616,7 @@ async function runThePopup(messageListener?: MessageListener): Promise<void> {
             const votingButtons = document.createElement("details");
             votingButtons.classList.add("votingButtons");
             votingButtons.id = "votingButtons" + UUID;
+            votingButtons.setAttribute("data-uuid", UUID);
             votingButtons.addEventListener("toggle", () => {
                 if (votingButtons.open) {
                     openedUUIDs.push(UUID);
@@ -698,6 +701,7 @@ async function runThePopup(messageListener?: MessageListener): Promise<void> {
             voteButtonsContainer.appendChild(downvoteButton);
             voteButtonsContainer.appendChild(uuidButton);
             if (downloadedTimes[i].actionType === ActionType.Skip || downloadedTimes[i].actionType === ActionType.Mute
+                    || downloadedTimes[i].actionType === ActionType.Poi
                     && [SponsorHideType.Visible, SponsorHideType.Hidden].includes(downloadedTimes[i].hidden)) {
                 voteButtonsContainer.appendChild(hideButton);
             }
@@ -1067,10 +1071,37 @@ async function runThePopup(messageListener?: MessageListener): Promise<void> {
         port.onMessage.addListener((msg) => onMessage(msg));
     }
 
+    function updateCurrentTime(currentTime: number) {
+        // Create a map of segment UUID -> segment object for easy access
+        const segmentMap: Record<string, SponsorTime> = {};
+        for (const segment of downloadedTimes)
+            segmentMap[segment.UUID] = segment
+
+        // Iterate over segment elements and update their classes
+        const segmentList = document.getElementById("issueReporterTimeButtons");
+        for (const segmentElement of segmentList.children) {
+            const UUID = segmentElement.getAttribute("data-uuid");
+            if (UUID == null || segmentMap[UUID] == undefined) continue;
+
+            const summaryElement = segmentElement.querySelector("summary")
+            if (summaryElement == null) continue;
+
+            const segment = segmentMap[UUID]
+            summaryElement.classList.remove("segmentActive", "segmentPassed")
+            if (currentTime >= segment.segment[0]) {
+                if (currentTime < segment.segment[1]) {
+                    summaryElement.classList.add("segmentActive");
+                } else {
+                    summaryElement.classList.add("segmentPassed");
+                }
+            }
+        }
+    }
+
     function onMessage(msg: PopupMessage) {
         switch (msg.message) {
             case "time":
-                displayDownloadedSponsorTimes(downloadedTimes, msg.time);
+                updateCurrentTime(msg.time);
                 break;
             case "infoUpdated":
                 infoFound(msg);

@@ -45,6 +45,8 @@ const utils = new Utils();
 // Hack to get the CSS loaded on permission-based sites (Invidious)
 utils.wait(() => Config.config !== null, 5000, 10).then(addCSS);
 
+const skipBuffer = 0.003;
+
 //was sponsor data found when doing SponsorsLookup
 let sponsorDataFound = false;
 //the actual sponsorTimes if loaded and UUIDs associated with them
@@ -259,6 +261,11 @@ function messageListener(request: Message, sender: unknown, sendResponse: (respo
             utils.getSponsorTimeFromUUID(sponsorTimes, request.UUID).hidden = request.type;
             utils.addHiddenSegment(sponsorVideoID, request.UUID, request.type);
             updatePreviewBar();
+
+            if (skipButtonControlBar?.isEnabled() 
+                && sponsorTimesSubmitting.every((s) => s.hidden !== SponsorHideType.Visible || s.actionType !== ActionType.Poi)) {
+                skipButtonControlBar.disable();
+            }
             break;
         case "closePopup":
             closeInfoMenu();
@@ -378,12 +385,12 @@ function resetValues() {
     // Reset advert playing flag
     isAdPlaying = false;
 
+    skipButtonControlBar?.disable();
+    categoryPill?.setVisibility(false);
+
     for (let i = 0; i < skipNotices.length; i++) {
         skipNotices.pop()?.close();
     }
-
-    skipButtonControlBar?.disable();
-    categoryPill?.setVisibility(false);
 }
 
 async function videoIDChange(id: string): Promise<void> {
@@ -508,6 +515,11 @@ function createPreviewBar(): void {
             // For Invidious/VideoJS
             selector: ".vjs-progress-holder",
             isVisibleCheck: false
+        }, {
+            // For Youtube Music
+            // there are two sliders, one for volume and one for progress - both called #progressContainer
+            selector: "#progress-bar>#sliderContainer>div>#sliderBar>#progressContainer",
+            isVisibleCheck: false
         }
     ];
 
@@ -598,7 +610,6 @@ function startSponsorSchedule(includeIntersectingSegments = false, currentTime?:
     const skipTime: number[] = [currentSkip?.scheduledTime, skipInfo.array[skipInfo.endIndex]?.segment[1]];
     const timeUntilSponsor = skipTime?.[0] - currentTime;
     const videoID = sponsorVideoID;
-    const skipBuffer = 0.003;
 
     if (videoMuted && !inMuteSegment(currentTime, skipInfo.index !== -1
             && timeUntilSponsor < skipBuffer && shouldAutoSkip(currentSkip))) {
@@ -1224,7 +1235,8 @@ function startSkipScheduleCheckingForStartSponsors() {
 
         // For highlight category
         const poiSegments = sponsorTimes
-            .filter((time) => time.segment[1] > video.currentTime && time.actionType === ActionType.Poi)
+            .filter((time) => time.segment[1] > video.currentTime 
+                && time.actionType === ActionType.Poi && time.hidden === SponsorHideType.Visible)
             .sort((a, b) => b.segment[0] - a.segment[0]);
         for (const time of poiSegments) {
             const skipOption = utils.getCategorySelection(time.category)?.option;
@@ -1521,7 +1533,7 @@ function getLatestEndTimeIndex(sponsorTimes: SponsorTime[], index: number, hideH
         const currentSegment = sponsorTimes[i].segment;
         const latestEndTime = sponsorTimes[latestEndTimeIndex].segment[1];
 
-        if (currentSegment[0] <= latestEndTime && currentSegment[1] > latestEndTime
+        if (currentSegment[0] - skipBuffer <= latestEndTime && currentSegment[1] > latestEndTime
             && (!hideHiddenSponsors || sponsorTimes[i].hidden === SponsorHideType.Visible)
             && shouldAutoSkip(sponsorTimes[i])
             && sponsorTimes[i].actionType === ActionType.Skip) {
@@ -1562,7 +1574,8 @@ function getStartTimes(sponsorTimes: SponsorTime[], includeIntersectingSegments:
 
     // Schedule at the end time to know when to unmute and remove title from seek bar
     sponsorTimes.forEach(sponsorTime => {
-        if (!possibleTimes.some((time) => sponsorTime.segment[1] === time.scheduledTime)) {
+        if (!possibleTimes.some((time) => sponsorTime.segment[1] === time.scheduledTime)
+            && (minimum === undefined || sponsorTime.segment[1] > minimum)) {
             possibleTimes.push({
                 ...sponsorTime,
                 scheduledTime: sponsorTime.segment[1]
@@ -2099,11 +2112,11 @@ async function vote(type: number, UUID: SegmentUUID, category?: Category, skipNo
     return response;
 }
 
-async function voteAsync(type: number, UUID: SegmentUUID, category?: Category): Promise<VoteResponse> {
+async function voteAsync(type: number, UUID: SegmentUUID, category?: Category): Promise<VoteResponse | undefined> {
     const sponsorIndex = utils.getSponsorIndexFromUUID(sponsorTimes, UUID);
 
     // Don't vote for preview sponsors
-    if (sponsorIndex == -1 || sponsorTimes[sponsorIndex].source !== SponsorSourceType.Server) return;
+    if (sponsorIndex == -1 || sponsorTimes[sponsorIndex].source !== SponsorSourceType.Server) return Promise.resolve(undefined);
 
     // See if the local time saved count and skip count should be saved
     if (type === 0 && sponsorSkipped[sponsorIndex] || type === 1 && !sponsorSkipped[sponsorIndex]) {
