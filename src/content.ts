@@ -154,6 +154,7 @@ let isAdPlaying = false;
 
 let lastResponseStatus: number;
 let retryCount = 0;
+let lookupWaiting = false;
 
 // Contains all of the functions and variables needed by the skip notice
 const skipNoticeContentContainer: ContentContainer = () => ({
@@ -965,10 +966,15 @@ function setupCategoryPill() {
 }
 
 async function sponsorsLookup(keepOldSubmissions = true) {
+    if (lookupWaiting) return;
     if (!video || !isVisible(video)) refreshVideoAttachments();
     //there is still no video here
     if (!video) {
-        setTimeout(() => sponsorsLookup(), 100);
+        lookupWaiting = true;
+        setTimeout(() => {
+            lookupWaiting = false;
+            sponsorsLookup()
+        }, 100);
         return;
     }
 
@@ -1198,7 +1204,7 @@ function retryFetch(errorCode: number): void {
     retryFetchTimeout = setTimeout(() => {
         if (sponsorVideoID && sponsorTimes?.length === 0
                 || sponsorTimes.every((segment) => segment.source !== SponsorSourceType.Server)) {
-            sponsorsLookup();
+            // sponsorsLookup();
         }
     }, delay);
 }
