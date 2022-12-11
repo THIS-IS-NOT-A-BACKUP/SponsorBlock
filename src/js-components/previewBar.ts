@@ -10,6 +10,7 @@ import { ChapterVote } from "../render/ChapterVote";
 import { ActionType, Category, SegmentContainer, SponsorHideType, SponsorSourceType, SponsorTime } from "../types";
 import { partition } from "../utils/arrayUtils";
 import { DEFAULT_CATEGORY, shortCategoryName } from "../utils/categoryUtils";
+import { normalizeChapterName } from "../utils/exporter";
 import { GenericUtils } from "../utils/genericUtils";
 import { findValidElement } from "../utils/pageUtils";
 
@@ -37,6 +38,10 @@ class PreviewBar {
     categoryTooltip?: HTMLDivElement;
     categoryTooltipContainer?: HTMLElement;
     chapterTooltip?: HTMLDivElement;
+    lastSmallestSegment: Record<string, {
+        index: number;
+        segment: PreviewBarSegment;
+    }> = {};
 
     parent: HTMLElement;
     onMobileYouTube: boolean;
@@ -92,6 +97,7 @@ class PreviewBar {
         this.chapterTooltip.className = "ytp-tooltip-title sponsorCategoryTooltip";
 
         const tooltipTextWrapper = document.querySelector(".ytp-tooltip-text-wrapper");
+        const originalTooltip = tooltipTextWrapper.querySelector(".ytp-tooltip-title:not(.sponsorCategoryTooltip)") as HTMLElement;
         if (!tooltipTextWrapper || !tooltipTextWrapper.parentElement) return;
 
         // Grab the tooltip from the text wrapper as the tooltip doesn't have its classes on init
@@ -118,8 +124,8 @@ class PreviewBar {
         const observer = new MutationObserver((mutations) => {
             if (!mouseOnSeekBar || !this.categoryTooltip || !this.categoryTooltipContainer) return;
 
-            // If the mutation observed is only for our tooltip text, ignore
-            if (mutations.some((mutation) => (mutation.target as HTMLElement).classList.contains("sponsorCategoryTooltip"))) {
+            // Only care about mutations to time tooltip
+            if (!mutations.some((mutation) => (mutation.target as HTMLElement).classList.contains("ytp-tooltip-text"))) {
                 return;
             }
 
@@ -138,14 +144,18 @@ class PreviewBar {
                 if (timeInSeconds !== null) break;
             }
 
-            if (timeInSeconds === null) return;
+            if (timeInSeconds === null) {
+                originalTooltip.style.removeProperty("display");
+
+                return;
+            }
 
             // Find the segment at that location, using the shortest if multiple found
             const [normalSegments, chapterSegments] = 
                 partition(this.segments.filter((s) => s.source !== SponsorSourceType.YouTube), 
                     (segment) => segment.actionType !== ActionType.Chapter);
-            let mainSegment = this.getSmallestSegment(timeInSeconds, normalSegments);
-            let secondarySegment = this.getSmallestSegment(timeInSeconds, chapterSegments);
+            let mainSegment = this.getSmallestSegment(timeInSeconds, normalSegments, "normal");
+            let secondarySegment = this.getSmallestSegment(timeInSeconds, chapterSegments, "chapter");
             if (mainSegment === null && secondarySegment !== null) {
                 mainSegment = secondarySegment;
                 secondarySegment = this.getSmallestSegment(timeInSeconds, chapterSegments.filter((s) => s !== secondarySegment));
@@ -153,6 +163,7 @@ class PreviewBar {
 
             if (mainSegment === null && secondarySegment === null) {
                 this.categoryTooltipContainer.classList.remove(TOOLTIP_VISIBLE_CLASS);
+                originalTooltip.style.removeProperty("display");
             } else {
                 this.categoryTooltipContainer.classList.add(TOOLTIP_VISIBLE_CLASS);
                 if (mainSegment !== null && secondarySegment !== null) {
@@ -164,6 +175,14 @@ class PreviewBar {
                 this.setTooltipTitle(mainSegment, this.categoryTooltip);
                 this.setTooltipTitle(secondarySegment, this.chapterTooltip);
 
+                if (normalizeChapterName(originalTooltip.textContent) === normalizeChapterName(this.categoryTooltip.textContent)
+                        || normalizeChapterName(originalTooltip.textContent) === normalizeChapterName(this.chapterTooltip.textContent)) {
+                    if (originalTooltip.style.display !== "none") originalTooltip.style.display = "none";
+                    noYoutubeChapters = true;
+                } else if (originalTooltip.style.display === "none") {
+                    originalTooltip.style.removeProperty("display");
+                }
+
                 // Used to prevent overlapping
                 this.categoryTooltip.classList.toggle("ytp-tooltip-text-no-title", noYoutubeChapters);
                 this.chapterTooltip.classList.toggle("ytp-tooltip-text-no-title", noYoutubeChapters);
@@ -171,6 +190,8 @@ class PreviewBar {
                 // To prevent offset issue
                 this.categoryTooltip.style.right = titleTooltip.style.right;
                 this.chapterTooltip.style.right = titleTooltip.style.right;
+                this.categoryTooltip.style.textAlign = titleTooltip.style.textAlign;
+                this.chapterTooltip.style.textAlign = titleTooltip.style.textAlign;
             }
         });
 
@@ -581,6 +602,7 @@ class PreviewBar {
             for (const mutation of mutations) {
                 if (mutation.type === "childList") {
                     this.update();
+                    break;
                 }
             }
 
@@ -900,11 +922,18 @@ class PreviewBar {
         return this.videoDuration * (showLarger ? 0.006 : 0.003);
     }
 
-    private getSmallestSegment(timeInSeconds: number, segments: PreviewBarSegment[]): PreviewBarSegment | null {
-        let segment: PreviewBarSegment | null = null;
-        let currentSegmentLength = Infinity;
+    // Name used for cache
+    private getSmallestSegment(timeInSeconds: number, segments: PreviewBarSegment[], name?: string): PreviewBarSegment | null {
+        const proposedIndex = name ? this.lastSmallestSegment[name]?.index : null;
+        const startSearchIndex = proposedIndex && segments[proposedIndex] === this.lastSmallestSegment[name].segment ? proposedIndex : 0;
+        const direction = startSearchIndex > 0 && timeInSeconds < this.lastSmallestSegment[name].segment.segment[0] ? -1 : 1;
 
-        for (const seg of segments) { //
+        let segment: PreviewBarSegment | null = null;
+        let index = -1;
+        let currentSegmentLength = Infinity;
+        
+        for (let i = startSearchIndex; i < segments.length && i >= 0; i += direction) {
+            const seg = segments[i];
             const segmentLength = seg.segment[1] - seg.segment[0];
             const minSize = this.getMinimumSize(seg.showLarger);
 
@@ -914,8 +943,21 @@ class PreviewBar {
                 if (segmentLength < currentSegmentLength) {
                     currentSegmentLength = segmentLength;
                     segment = seg;
+                    index = i;
                 }
             }
+
+            if ((direction === 1 && timeInSeconds > seg.segment[1])
+                || (direction === -1 && timeInSeconds < seg.segment[0])) {
+                break;
+            }
+        }
+
+        if (segment) {
+            this.lastSmallestSegment[name] = {
+                index: index,
+                segment: segment
+            };
         }
 
         return segment;
