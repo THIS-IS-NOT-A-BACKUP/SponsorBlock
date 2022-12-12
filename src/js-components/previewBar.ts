@@ -62,6 +62,7 @@ class PreviewBar {
     originalChapterBar: HTMLElement;
     originalChapterBarBlocks: NodeListOf<HTMLElement>;
     chapterMargin: number;
+    lastRenderedSegments: PreviewBarSegment[];
     unfilteredChapterGroups: ChapterGroup[];
     chapterGroups: ChapterGroup[];
 
@@ -356,8 +357,13 @@ class PreviewBar {
             return;
         }
 
-        // Merge overlapping chapters
-        this.unfilteredChapterGroups = this.createChapterRenderGroups(segments);
+        const remakingBar = segments !== this.lastRenderedSegments;
+        if (remakingBar) {
+            this.lastRenderedSegments = segments;
+
+            // Merge overlapping chapters
+            this.unfilteredChapterGroups = this.createChapterRenderGroups(segments);
+        }
 
         if (segments.every((segments) => segments.source === SponsorSourceType.YouTube) 
             || (!Config.config.renderSegmentsAsChapters 
@@ -444,7 +450,9 @@ class PreviewBar {
             }
         }
 
-        this.updateChapterAllMutation(this.originalChapterBar, this.progressBar, true);
+        if (remakingBar) {
+            this.updateChapterAllMutation(this.originalChapterBar, this.progressBar, true);
+        }
     }
 
     createChapterRenderGroups(segments: PreviewBarSegment[]): ChapterGroup[] {
@@ -922,7 +930,7 @@ class PreviewBar {
         return this.videoDuration * (showLarger ? 0.006 : 0.003);
     }
 
-    // Name used for cache
+    // Name parameter used for cache
     private getSmallestSegment(timeInSeconds: number, segments: PreviewBarSegment[], name?: string): PreviewBarSegment | null {
         const proposedIndex = name ? this.lastSmallestSegment[name]?.index : null;
         const startSearchIndex = proposedIndex && segments[proposedIndex] === this.lastSmallestSegment[name].segment ? proposedIndex : 0;
@@ -947,8 +955,7 @@ class PreviewBar {
                 }
             }
 
-            if ((direction === 1 && timeInSeconds > seg.segment[1])
-                || (direction === -1 && timeInSeconds < seg.segment[0])) {
+            if (direction === 1 && seg.segment[0] > timeInSeconds) {
                 break;
             }
         }
