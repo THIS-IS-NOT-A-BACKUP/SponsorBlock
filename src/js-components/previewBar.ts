@@ -314,7 +314,7 @@ class PreviewBar {
         if (chapterChevron) {
             if (this.segments.some((segment) => segment.source === SponsorSourceType.YouTube)) {
                 chapterChevron.style.removeProperty("display");
-            } else {
+            } else if (this.segments) {
                 chapterChevron.style.display = "none";
             }
         }
@@ -814,7 +814,16 @@ class PreviewBar {
                 chapterButton.disabled = false;
 
                 const chapterTitle = chaptersContainer.querySelector(".ytp-chapter-title-content") as HTMLDivElement;
-                chapterTitle.innerText = chosenSegment.description || shortCategoryName(chosenSegment.category);
+                chapterTitle.innerText = "";
+
+                const chapterCustomText = (chapterTitle.querySelector(".sponsorChapterText") || (() => {
+                    const elem = document.createElement("div");
+                    chapterTitle.appendChild(elem);
+                    elem.classList.add("sponsorChapterText");
+                    return elem;
+                })()) as HTMLDivElement;
+                chapterCustomText.innerText = chosenSegment.description || shortCategoryName(chosenSegment.category);
+
                 if (chosenSegment.actionType !== ActionType.Chapter) {
                     chapterTitle.classList.add("sponsorBlock-segment-title");
                 } else {
@@ -838,7 +847,13 @@ class PreviewBar {
                     this.chapterVote.setVisibility(false);
                 }
             } else {
-                chaptersContainer.style.display = "none";
+                chaptersContainer.querySelector(".sponsorChapterText")?.remove();
+                const chapterTitle = chaptersContainer.querySelector(".ytp-chapter-title-content") as HTMLDivElement;
+                if (chapterTitle.innerText === "") {
+                    chaptersContainer.style.display = "none";
+                } else {
+                    chaptersContainer.style.removeProperty("display");
+                }
                 this.chapterVote.setVisibility(false);
             }
         }

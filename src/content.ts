@@ -313,7 +313,7 @@ function messageListener(request: Message, sender: unknown, sendResponse: (respo
             break;
         }
         case "keydown":
-            document.dispatchEvent(new KeyboardEvent('keydown', {
+            (document.body || document).dispatchEvent(new KeyboardEvent('keydown', {
                 key: request.key,
                 keyCode: request.keyCode,
                 code: request.code,
@@ -526,6 +526,9 @@ function createPreviewBar(): void {
             // For Youtube Music
             // there are two sliders, one for volume and one for progress - both called #progressContainer
             selector: "#progress-bar>#sliderContainer>div>#sliderBar>#progressContainer",
+        }, {
+            // For piped
+            selector: ".shaka-ad-markers",
             isVisibleCheck: false
         }
     ];
@@ -1206,7 +1209,7 @@ async function sponsorsLookup(keepOldSubmissions = true) {
 function importExistingChapters(wait: boolean) {
     if (!existingChaptersImported) {
         waitFor(() => video?.duration && getExistingChapters(sponsorVideoID, video.duration),
-            wait ? 5000 : 0, 100, (c) => c?.length > 0).then((chapters) => {
+            wait ? 15000 : 0, 400, (c) => c?.length > 0).then((chapters) => {
                 if (!existingChaptersImported && chapters?.length > 0) {
                     sponsorTimes = (sponsorTimes ?? []).concat(...chapters).sort((a, b) => a.segment[0] - b.segment[0]);
                     existingChaptersImported = true;
@@ -2096,19 +2099,33 @@ function openInfoMenu() {
     frame.src = chrome.extension.getURL("popup.html");
     popup.appendChild(frame);
 
-    const parentNodes = document.querySelectorAll("#secondary-inner");
-    let parentNode = null;
-    for (let i = 0; i < parentNodes.length; i++) {
-        if (parentNodes[i].firstElementChild !== null) {
-            parentNode = parentNodes[i];
+    const elemHasChild = (elements: NodeListOf<HTMLElement>): Element => {
+        let parentNode: Element;
+        for (const node of elements) {
+            if (node.firstElementChild !== null) {
+                parentNode = node;
+            }
         }
-    }
-    if (parentNode == null) {
-        //old youtube theme
-        parentNode = document.getElementById("watch7-sidebar-contents");
+        return parentNode
     }
 
-    parentNode.insertBefore(popup, parentNode.firstChild);
+    const parentNodeOptions = [{
+        // YouTube 
+        selector: "#secondary-inner",
+        hasChildCheck: true
+    }, {
+        // old youtube theme
+        selector: "#watch7-sidebar-contents",
+    }];
+    for (const option of parentNodeOptions) {
+        const allElements = document.querySelectorAll(option.selector) as NodeListOf<HTMLElement>;
+        const el = option.hasChildCheck ? elemHasChild(allElements) : allElements[0];
+
+        if (el) {
+            if (option.hasChildCheck) el.insertBefore(popup, el.firstChild);
+            break;
+        }
+    }
 }
 
 function closeInfoMenu() {
@@ -2484,11 +2501,23 @@ function addPageListeners(): void {
 
     document.addEventListener("yt-navigate-start", resetValues);
     document.addEventListener("yt-navigate-finish", refreshListners);
+    // piped player init
+    window.addEventListener("playerInit", () => {
+        if (!document.querySelector('meta[property="og:title"][content="Piped"]')) return
+        previewBar = null; // remove old previewbar
+        createPreviewBar()
+    });
     window.addEventListener("message", windowListenerHandler);
 }
 
 function addHotkeyListener(): void {
     document.addEventListener("keydown", hotkeyListener);
+
+    document.addEventListener("DOMContentLoaded", () => {
+        // Allow us to stop propagation to YouTube by being deeper
+        document.removeEventListener("keydown", hotkeyListener);
+        document.body.addEventListener("keydown", hotkeyListener);
+    });
 }
 
 function hotkeyListener(e: KeyboardEvent): void {
@@ -2520,9 +2549,11 @@ function hotkeyListener(e: KeyboardEvent): void {
         submitSponsorTimes();
         return;
     } else if (keybindEquals(key, nextChapterKey)) {
+        if (sponsorTimes.length > 0) e.stopPropagation();
         nextChapter();
         return;
     } else if (keybindEquals(key, previousChapterKey)) {
+        if (sponsorTimes.length > 0) e.stopPropagation();
         previousChapter();
         return;
     }
