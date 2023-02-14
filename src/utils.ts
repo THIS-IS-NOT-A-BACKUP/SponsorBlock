@@ -1,10 +1,12 @@
 import Config, { VideoDownvotes } from "./config";
-import { CategorySelection, SponsorTime, FetchResponse, BackgroundScriptContainer, Registration, HashedValue, VideoID, SponsorHideType } from "./types";
+import { CategorySelection, SponsorTime, BackgroundScriptContainer, Registration, VideoID, SponsorHideType } from "./types";
 
+import { getHash, HashedValue } from "@ajayyy/maze-utils/lib/hash";
 import * as CompileConfig from "../config.json";
 import { waitFor } from "@ajayyy/maze-utils";
 import { isSafari } from "./utils/configUtils";
 import { findValidElementFromSelector } from "@ajayyy/maze-utils/lib/dom";
+import { FetchResponse, sendRequestToCustomServer } from "@ajayyy/maze-utils/lib/background-request-proxy"
 
 export default class Utils {
     
@@ -251,18 +253,8 @@ export default class Utils {
      * @param address The address to add to the SponsorBlock server address
      * @param callback 
      */    
-    async asyncRequestToCustomServer(type: string, url: string, data = {}): Promise<FetchResponse> {
-        return new Promise((resolve) => {
-            // Ask the background script to do the work
-            chrome.runtime.sendMessage({
-                message: "sendRequest",
-                type,
-                url,
-                data
-            }, (response) => {
-                resolve(response);
-            });
-        });
+    asyncRequestToCustomServer(type: string, url: string, data = {}): Promise<FetchResponse> {
+        return sendRequestToCustomServer(type, url, data);
     }
 
     /**
@@ -345,25 +337,11 @@ export default class Utils {
         return typeof(browser) !== "undefined";
     }
 
-    async getHash<T extends string>(value: T, times = 5000): Promise<T & HashedValue> {
-        if (times <= 0) return "" as T & HashedValue;
-
-        let hashHex: string = value;
-        for (let i = 0; i < times; i++) {
-            const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashHex).buffer);
-
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        return hashHex as T & HashedValue;
-    }
-
     async addHiddenSegment(videoID: VideoID, segmentUUID: string, hidden: SponsorHideType) {
         if (chrome.extension.inIncognitoContext || !Config.config.trackDownvotes) return;
 
-        const hashedVideoID = (await this.getHash(videoID, 1)).slice(0, 4) as VideoID & HashedValue;
-        const UUIDHash = await this.getHash(segmentUUID, 1);
+        const hashedVideoID = (await getHash(videoID, 1)).slice(0, 4) as VideoID & HashedValue;
+        const UUIDHash = await getHash(segmentUUID, 1);
 
         const allDownvotes = Config.local.downvotedSegments;
         const currentVideoData = allDownvotes[hashedVideoID] || { segments: [], lastAccess: 0 };

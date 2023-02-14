@@ -3,6 +3,8 @@ import * as CompileConfig from "../config.json";
 import Config from "./config";
 import { Registration } from "./types";
 import registerContentScript from 'content-scripts-register-polyfill/ponyfill.js';
+import { sendRealRequestToCustomServer, setupBackgroundRequestProxy } from "@ajayyy/maze-utils/lib/background-request-proxy";
+import { setupTabUpdates } from "@ajayyy/maze-utils/lib/tab-updates";
 
 // Make the config public for debugging purposes
 
@@ -25,34 +27,8 @@ utils.wait(() => Config.config !== null).then(function() {
     if (Config.config.supportInvidious) utils.setupExtraSiteContentScripts();
 });
 
-function onTabUpdatedListener(tabId: number) {
-    chrome.tabs.sendMessage(tabId, {
-        message: 'update',
-    }, () => void chrome.runtime.lastError ); // Suppress error on Firefox
-}
-
-function onNavigationApiAvailableChange(changes: {[key: string]: chrome.storage.StorageChange}) {
-    if (changes.navigationApiAvailable) {
-        if (changes.navigationApiAvailable.newValue) {
-            chrome.tabs.onUpdated.removeListener(onTabUpdatedListener);
-        } else {
-            chrome.tabs.onUpdated.addListener(onTabUpdatedListener);
-        }
-    }
-}
-
-// If Navigation API is not supported, then background has to inform content script about video change.
-// This happens on Safari, Firefox, and Chromium 101 (inclusive) and below.
-chrome.tabs.onUpdated.addListener(onTabUpdatedListener);
-utils.wait(() => Config.local !== null).then(() => {
-    if (Config.local.navigationApiAvailable) {
-        chrome.tabs.onUpdated.removeListener(onTabUpdatedListener);
-    }
-});
-
-if (!Config.configSyncListeners.includes(onNavigationApiAvailableChange)) {
-        Config.configSyncListeners.push(onNavigationApiAvailableChange);
-}
+setupBackgroundRequestProxy();
+setupTabUpdates(Config);
 
 chrome.runtime.onMessage.addListener(function (request, sender, callback) {
     switch(request.message) {
@@ -68,16 +44,6 @@ chrome.runtime.onMessage.addListener(function (request, sender, callback) {
         case "openPage":
             chrome.tabs.create({url: chrome.runtime.getURL(request.url)});
             return false;
-        case "sendRequest":
-            sendRequestToCustomServer(request.type, request.url, request.data).then(async (response) => {
-                callback({
-                    responseText: await response.text(),
-                    status: response.status,
-                    ok: response.ok
-                });
-            });
-
-            return true;
         case "submitVote":
             submitVote(request.type, request.UUID, request.category).then(callback);
 
@@ -222,35 +188,9 @@ async function submitVote(type: number, UUID: string, category: string) {
     }
 }
 
+
 async function asyncRequestToServer(type: string, address: string, data = {}) {
     const serverAddress = Config.config.testingServer ? CompileConfig.testingServerAddress : Config.config.serverAddress;
 
-    return await (sendRequestToCustomServer(type, serverAddress + address, data));
-}
-
-/**
- * Sends a request to the specified url
- *
- * @param type The request type "GET", "POST", etc.
- * @param address The address to add to the SponsorBlock server address
- * @param callback
- */
-async function sendRequestToCustomServer(type: string, url: string, data = {}) {
-    // If GET, convert JSON to parameters
-    if (type.toLowerCase() === "get") {
-        url = GenericUtils.objectToURI(url, data, true);
-
-        data = null;
-    }
-
-    const response = await fetch(url, {
-        method: type,
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        redirect: 'follow',
-        body: data ? JSON.stringify(data) : null
-    });
-
-    return response;
+    return await (sendRealRequestToCustomServer(type, serverAddress + address, data));
 }
