@@ -531,7 +531,7 @@ function cancelSponsorSchedule(): void {
 /**
  * @param currentTime Optional if you don't want to use the actual current time
  */
-function startSponsorSchedule(includeIntersectingSegments = false, currentTime?: number, includeNonIntersectingSegments = true): void {
+async function startSponsorSchedule(includeIntersectingSegments = false, currentTime?: number, includeNonIntersectingSegments = true): Promise<void> {
     cancelSponsorSchedule();
 
     // Don't skip if advert playing and reset last checked time
@@ -545,7 +545,7 @@ function startSponsorSchedule(includeIntersectingSegments = false, currentTime?:
     }
 
     // Give up if video changed, and trigger a videoID change if so
-    if (checkIfNewVideoID()) {
+    if (await checkIfNewVideoID()) {
         return;
     }
 
@@ -1676,14 +1676,15 @@ function shouldAutoSkip(segment: SponsorTime): boolean {
     return (!Config.config.manualSkipOnFullVideo || !sponsorTimes?.some((s) => s.category === segment.category && s.actionType === ActionType.Full))
         && (utils.getCategorySelection(segment.category)?.option === CategorySkipOption.AutoSkip ||
             (Config.config.autoSkipOnMusicVideos && sponsorTimes?.some((s) => s.category === "music_offtopic")
-                && segment.actionType !== ActionType.Poi));
+                && segment.actionType === ActionType.Skip));
 }
 
 function shouldSkip(segment: SponsorTime): boolean {
     return (segment.actionType !== ActionType.Full
             && segment.source !== SponsorSourceType.YouTube
             && utils.getCategorySelection(segment.category)?.option !== CategorySkipOption.ShowOverlay)
-            || (Config.config.autoSkipOnMusicVideos && sponsorTimes?.some((s) => s.category === "music_offtopic"));
+            || (Config.config.autoSkipOnMusicVideos && sponsorTimes?.some((s) => s.category === "music_offtopic") 
+                && segment.actionType === ActionType.Skip);
 }
 
 /** Creates any missing buttons on the YouTube player if possible. */
