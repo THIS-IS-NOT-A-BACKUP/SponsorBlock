@@ -41,8 +41,8 @@ import { StorageChangesObject } from "@ajayyy/maze-utils/lib/config";
 import { findValidElement } from "@ajayyy/maze-utils/lib/dom"
 import { getHash, HashedValue } from "@ajayyy/maze-utils/lib/hash";
 import { generateUserID } from "@ajayyy/maze-utils/lib/setup";
-import { setThumbnailListener, updateAll } from "@ajayyy/maze-utils/lib/thumbnailManagement";
-import { labelThumbnails, setupThumbnailPageLoadListener } from "./utils/thumbnails";
+import { updateAll } from "@ajayyy/maze-utils/lib/thumbnailManagement";
+import { setupThumbnailListener } from "./utils/thumbnails";
 import * as documentScript from "../dist/js/document.js";
 
 const utils = new Utils();
@@ -113,8 +113,7 @@ setupVideoModule({
     resetValues,
     documentScript
 }, () => Config);
-setThumbnailListener(labelThumbnails);
-setupThumbnailPageLoadListener();
+setupThumbnailListener();
 
 //the video id of the last preview bar update
 let lastPreviewBarUpdate: VideoID;
@@ -684,6 +683,7 @@ async function startSponsorSchedule(includeIntersectingSegments = false, current
             const reportedVideoTimeAtStart = getVideo().currentTime;
             logDebug(`Starting setInterval skipping ${getVideo().currentTime} to skip at ${skipTime[0]}`);
 
+            if (currentSkipInterval !== null) clearInterval(currentSkipInterval);
             currentSkipInterval = setInterval(() => {
                 // Estimate delay, but only take the current time right after a change
                 // Current time remains the same for many "frames" on Firefox
@@ -765,12 +765,13 @@ function inMuteSegment(currentTime: number, includeOverlap: boolean): boolean {
  */
 function incorrectVideoCheck(videoID?: string, sponsorTime?: SponsorTime): boolean {
     const currentVideoID = getYouTubeVideoID();
-    if (currentVideoID !== (videoID || getVideoID()) || (sponsorTime
+    const recordedVideoID = videoID || getVideoID();
+    if (currentVideoID !== recordedVideoID || (sponsorTime
             && (!sponsorTimes || !sponsorTimes?.some((time) => time.segment === sponsorTime.segment))
             && !sponsorTimesSubmitting.some((time) => time.segment === sponsorTime.segment))) {
         // Something has really gone wrong
         console.error("[SponsorBlock] The videoID recorded when trying to skip is different than what it should be.");
-        console.error("[SponsorBlock] VideoID recorded: " + getVideoID() + ". Actual VideoID: " + currentVideoID);
+        console.error("[SponsorBlock] VideoID recorded: " + recordedVideoID + ". Actual VideoID: " + currentVideoID);
 
         // Video ID change occured
         checkVideoIDChange();
