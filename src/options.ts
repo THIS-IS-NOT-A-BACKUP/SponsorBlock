@@ -17,6 +17,7 @@ import { localizeHtmlPage } from "@ajayyy/maze-utils/lib/setup";
 import { StorageChangesObject } from "@ajayyy/maze-utils/lib/config";
 import { getHash } from "@ajayyy/maze-utils/lib/hash";
 import { isFirefoxOrSafari } from "@ajayyy/maze-utils";
+import { isDeArrowInstalled } from "./utils/crossExtension";
 const utils = new Utils();
 let embed = false;
 
@@ -66,6 +67,18 @@ async function init() {
     donate.addEventListener("click", () => Config.config.donateClicked = Config.config.donateClicked + 1);
     if (!showDonationLink()) {
         donate.classList.add("hidden");
+    }
+
+    // DeArrow promotion
+    if (Config.config.showNewFeaturePopups && Config.config.showUpsells) {
+        isDeArrowInstalled().then((installed) => {
+            if (!installed) {
+                const deArrowPromotion = document.getElementById("deArrowPromotion");
+                deArrowPromotion.classList.remove("hidden");
+
+                deArrowPromotion.addEventListener("click", () => Config.config.showDeArrowPromotion = false);
+            }
+        });
     }
 
     // Set all of the toggle options to the correct option

@@ -54,6 +54,7 @@ interface SBConfig {
     showDonationLink: boolean;
     showPopupDonationCount: number;
     showUpsells: boolean;
+    showNewFeaturePopups: boolean;
     donateClicked: number;
     autoHideInfoButton: boolean;
     autoSkipOnMusicVideos: boolean;
@@ -72,6 +73,8 @@ interface SBConfig {
     useVirtualTime: boolean;
     showSegmentFailedToFetchWarning: boolean;
     allowScrollingToEdit: boolean;
+    deArrowInstalled: boolean;
+    showDeArrowPromotion: boolean;
 
     // Used to cache calculated text color info
     categoryPillColors: {
@@ -292,6 +295,7 @@ const syncDefaults = {
     showDonationLink: true,
     showPopupDonationCount: 0,
     showUpsells: true,
+    showNewFeaturePopups: true,
     donateClicked: 0,
     autoHideInfoButton: true,
     autoSkipOnMusicVideos: false,
@@ -305,6 +309,8 @@ const syncDefaults = {
     useVirtualTime: true,
     showSegmentFailedToFetchWarning: true,
     allowScrollingToEdit: true,
+    deArrowInstalled: false,
+    showDeArrowPromotion: true,
 
     categoryPillColors: {},
 
