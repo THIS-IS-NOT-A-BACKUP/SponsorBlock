@@ -44,6 +44,7 @@ import { setupThumbnailListener } from "./utils/thumbnails";
 import * as documentScript from "../dist/js/document.js";
 import { Tooltip } from "./render/Tooltip";
 import { isDeArrowInstalled } from "./utils/crossExtension";
+import { runCompatibilityChecks } from "./utils/compatibility";
 
 const utils = new Utils();
 
@@ -87,7 +88,9 @@ utils.wait(() => Config.isReady(), 5000, 10).then(() => {
                 Config.config.showDeArrowPromotion = false;
             }
         }
-    }, 5000)
+    }, 5000);
+
+    runCompatibilityChecks();
 });
 
 const skipBuffer = 0.003;
@@ -521,7 +524,7 @@ function createPreviewBar(): void {
             selector: ".vjs-progress-holder",
             isVisibleCheck: false
         }, {
-            // For Youtube Music
+            // For Youtube Music and YTKids
             // there are two sliders, one for volume and one for progress - both called #progressContainer
             selector: "#progress-bar>#sliderContainer>div>#sliderBar>#progressContainer",
         }, {
