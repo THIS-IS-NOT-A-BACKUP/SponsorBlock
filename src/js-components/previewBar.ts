@@ -13,6 +13,7 @@ import { DEFAULT_CATEGORY, shortCategoryName } from "../utils/categoryUtils";
 import { normalizeChapterName } from "../utils/exporter";
 import { getFormattedTimeToSeconds } from "../maze-utils/formating";
 import { findValidElement } from "../maze-utils/dom";
+import { addCleanupListener } from "../maze-utils/cleanup";
 
 const TOOLTIP_VISIBLE_CLASS = 'sponsorCategoryTooltipVisible';
 const MIN_CHAPTER_SIZE = 0.003;
@@ -200,6 +201,10 @@ class PreviewBar {
         observer.observe(tooltipTextWrapper, {
             childList: true,
             subtree: true,
+        });
+
+        addCleanupListener(() => {
+            observer.disconnect();
         });
     }
 
@@ -626,6 +631,11 @@ class PreviewBar {
         childListObserver.observe(this.originalChapterBar, {
             childList: true
         });
+
+        addCleanupListener(() => {
+            attributeObserver.disconnect();
+            childListObserver.disconnect();
+        });
     }
 
     private updateChapterAllMutation(originalChapterBar: HTMLElement, progressBar: HTMLElement, firstUpdate = false): void {
@@ -774,10 +784,11 @@ class PreviewBar {
         if (!Config.config.showSegmentNameInChapterBar
                 || ((!segments || segments.length <= 0) && submittingSegments?.length <= 0)) {
             const chaptersContainer = this.getChaptersContainer();
-            const chapterButton = this.getChapterButton(chaptersContainer);
-            if (chapterButton && chapterButton.classList.contains("ytp-chapter-container-disabled")) {
-                chaptersContainer.style.display = "none";
-            }
+            chaptersContainer.querySelector(".sponsorChapterText")?.remove();
+            const chapterTitle = chaptersContainer.querySelector(".ytp-chapter-title-content") as HTMLDivElement;
+
+            chapterTitle.style.removeProperty("display");
+            chaptersContainer.classList.remove("sponsorblock-chapter-visible");
 
             return [];
         }
@@ -802,7 +813,7 @@ class PreviewBar {
 
         if (chaptersContainer) {
             if (segments.length > 0) {
-                chaptersContainer.style.removeProperty("display");
+                chaptersContainer.classList.add("sponsorblock-chapter-visible");
 
                 const chosenSegment = segments.sort((a, b) => {
                     if (a.actionType === ActionType.Chapter && b.actionType !== ActionType.Chapter) {
@@ -819,11 +830,11 @@ class PreviewBar {
                 chapterButton.disabled = false;
 
                 const chapterTitle = chaptersContainer.querySelector(".ytp-chapter-title-content") as HTMLDivElement;
-                chapterTitle.innerText = "";
+                chapterTitle.style.display = "none";
 
-                const chapterCustomText = (chapterTitle.querySelector(".sponsorChapterText") || (() => {
+                const chapterCustomText = (chapterTitle.parentElement.querySelector(".sponsorChapterText") || (() => {
                     const elem = document.createElement("div");
-                    chapterTitle.appendChild(elem);
+                    chapterTitle.parentElement.insertBefore(elem, chapterTitle);
                     elem.classList.add("sponsorChapterText");
                     return elem;
                 })()) as HTMLDivElement;
@@ -854,11 +865,10 @@ class PreviewBar {
             } else {
                 chaptersContainer.querySelector(".sponsorChapterText")?.remove();
                 const chapterTitle = chaptersContainer.querySelector(".ytp-chapter-title-content") as HTMLDivElement;
-                if (chapterTitle.innerText === "") {
-                    chaptersContainer.style.display = "none";
-                } else {
-                    chaptersContainer.style.removeProperty("display");
-                }
+
+                chapterTitle.style.removeProperty("display");
+                chaptersContainer.classList.remove("sponsorblock-chapter-visible");
+                
                 this.chapterVote.setVisibility(false);
             }
         }

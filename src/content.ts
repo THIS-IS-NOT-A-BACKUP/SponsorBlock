@@ -24,7 +24,7 @@ import SubmissionNotice from "./render/SubmissionNotice";
 import { Message, MessageResponse, VoteResponse } from "./messageTypes";
 import { SkipButtonControlBar } from "./js-components/skipButtonControlBar";
 import { getStartTimeFromUrl } from "./utils/urlParser";
-import { getControls, getExistingChapters, getHashParams, isVisible } from "./utils/pageUtils";
+import { getControls, getExistingChapters, getHashParams, isPlayingPlaylist, isVisible } from "./utils/pageUtils";
 import { CategoryPill } from "./render/CategoryPill";
 import { AnimationUtils } from "./utils/animationUtils";
 import { GenericUtils } from "./utils/genericUtils";
@@ -45,6 +45,10 @@ import * as documentScript from "../dist/js/document.js";
 import { Tooltip } from "./render/Tooltip";
 import { isDeArrowInstalled } from "./utils/crossExtension";
 import { runCompatibilityChecks } from "./utils/compatibility";
+import { cleanPage } from "./utils/pageCleaner";
+import { addCleanupListener } from "./maze-utils/cleanup";
+
+cleanPage();
 
 const utils = new Utils();
 
@@ -473,6 +477,8 @@ function videoIDChange(): void {
 }
 
 function handleMobileControlsMutations(): void {
+    if (!chrome.runtime?.id) return;
+
     updateVisibilityOfPlayerControlsButton();
 
     skipButtonControlBar?.updateMobileControls();
@@ -703,7 +709,7 @@ async function startSponsorSchedule(includeIntersectingSegments = false, current
 
         // Don't pretend to be earlier than we are, could result in loops
         if (forcedSkipTime !== null && forceVideoTime > forcedSkipTime) {
-            forcedSkipTime = null;
+            forcedSkipTime = forceVideoTime;
         }
 
         startSponsorSchedule(forcedIncludeIntersectingSegments, forcedSkipTime, forcedIncludeNonIntersectingSegments);
@@ -812,10 +818,18 @@ function incorrectVideoCheck(videoID?: string, sponsorTime?: SponsorTime): boole
     }
 }
 
+let setupVideoListenersFirstTime = true;
 function setupVideoListeners() {
     //wait until it is loaded
     getVideo().addEventListener('loadstart', videoOnReadyListener)
     getVideo().addEventListener('durationchange', durationChangeListener);
+
+    if (setupVideoListenersFirstTime) {
+        addCleanupListener(() => {
+            getVideo().removeEventListener('loadstart', videoOnReadyListener);
+            getVideo().removeEventListener('durationchange', durationChangeListener);
+        });
+    }
 
     if (!Config.config.disableSkipping) {
         switchingVideos = false;
@@ -823,7 +837,7 @@ function setupVideoListeners() {
         let startedWaiting = false;
         let lastPausedAtZero = true;
 
-        getVideo().addEventListener('play', () => {
+        const playListener = () => {
             // If it is not the first event, then the only way to get to 0 is if there is a seek event
             // This check makes sure that changing the video resolution doesn't cause the extension to think it
             // gone back to the begining
@@ -854,8 +868,10 @@ function setupVideoListeners() {
                 startSponsorSchedule();
             }
 
-        });
-        getVideo().addEventListener('playing', () => {
+        };
+        getVideo().addEventListener('play', playListener);
+
+        const playingListener = () => {
             updateVirtualTime();
             lastPausedAtZero = false;
 
@@ -881,8 +897,10 @@ function setupVideoListeners() {
 
                 startSponsorSchedule();
             }
-        });
-        getVideo().addEventListener('seeking', () => {
+        };
+        getVideo().addEventListener('playing', playingListener);
+        
+        const seekingListener = () => {
             lastKnownVideoTime.fromPause = false;
 
             if (!getVideo().paused){
@@ -906,20 +924,19 @@ function setupVideoListeners() {
                     lastPausedAtZero = true;
                 }
             }
-        });
-        getVideo().addEventListener('ratechange', () => {
+        };
+        getVideo().addEventListener('seeking', seekingListener);
+        
+        const rateChangeListener = () => {
             updateVirtualTime();
             clearWaitingTime();
 
             startSponsorSchedule();
-        });
+        };
+        getVideo().addEventListener('ratechange', () => rateChangeListener);
         // Used by videospeed extension (https://github.com/igrigorik/videospeed/pull/740)
-        getVideo().addEventListener('videoSpeed_ratechange', () => {
-            updateVirtualTime();
-            clearWaitingTime();
+        getVideo().addEventListener('videoSpeed_ratechange', rateChangeListener);
 
-            startSponsorSchedule();
-        });
         const stoppedPlayback = () => {
             // Reset lastCheckVideoTime
             lastCheckVideoTime = -1;
@@ -931,20 +948,36 @@ function setupVideoListeners() {
 
             cancelSponsorSchedule();
         };
-        getVideo().addEventListener('pause', () => {
+        const pauseListener = () => {
             lastKnownVideoTime.fromPause = true;
 
             stoppedPlayback();
-        });
-        getVideo().addEventListener('waiting', () => {
+        };
+        getVideo().addEventListener('pause', pauseListener);
+        const waitingListener = () => {
             logDebug("[SB] Not skipping due to buffering");
             startedWaiting = true;
 
             stoppedPlayback();
-        });
+        };
+        getVideo().addEventListener('waiting', waitingListener);
 
         startSponsorSchedule();
+
+        if (setupVideoListenersFirstTime) {
+            addCleanupListener(() => {
+                getVideo().removeEventListener('play', playListener);
+                getVideo().removeEventListener('playing', playingListener);
+                getVideo().removeEventListener('seeking', seekingListener);
+                getVideo().removeEventListener('ratechange', rateChangeListener);
+                getVideo().removeEventListener('videoSpeed_ratechange', rateChangeListener);
+                getVideo().removeEventListener('pause', pauseListener);
+                getVideo().removeEventListener('waiting', waitingListener);
+            });
+        }
     }
+
+    setupVideoListenersFirstTime = false;
 }
 
 function updateVirtualTime() {
@@ -1356,18 +1389,20 @@ async function channelIDChange(channelIDInfo: ChannelIDInfo) {
 }
 
 function videoElementChange(newVideo: boolean): void {
-    if (newVideo) {
-        setupVideoListeners();
-        setupSkipButtonControlBar();
-        setupCategoryPill();
-    }
-
-    checkPreviewbarState();
-
-    // Incase the page is still transitioning, check again in a few seconds
-    setTimeout(checkPreviewbarState, 100);
-    setTimeout(checkPreviewbarState, 1000);
-    setTimeout(checkPreviewbarState, 5000);
+    waitFor(() => Config.isReady()).then(() => {
+        if (newVideo) {
+            setupVideoListeners();
+            setupSkipButtonControlBar();
+            setupCategoryPill();
+        }
+    
+        checkPreviewbarState();
+    
+        // Incase the page is still transitioning, check again in a few seconds
+        setTimeout(checkPreviewbarState, 100);
+        setTimeout(checkPreviewbarState, 1000);
+        setTimeout(checkPreviewbarState, 5000);
+    })
 }
 
 function checkPreviewbarState(): void {
@@ -1587,8 +1622,10 @@ function skipToTime({v, skipTime, skippingSegments, openNotice, forceAutoSkip, u
                 // for some reason you also can't skip to 1 second before the end
                 if (v.loop && v.duration > 1 && skipTime[1] >= v.duration - 1) {
                     v.currentTime = 0;
-                } else if (navigator.vendor === "Apple Computer, Inc." && v.duration > 1 && skipTime[1] >= v.duration) {
+                } else if (v.duration > 1 && skipTime[1] >= v.duration
+                        && (navigator.vendor === "Apple Computer, Inc." || isPlayingPlaylist())) {
                     // MacOS will loop otherwise #1027
+                    // Sometimes playlists loop too #1804
                     v.currentTime = v.duration - 0.001;
                 } else {
                     if (inMuteSegment(skipTime[1], true)) {
@@ -1619,9 +1656,10 @@ function skipToTime({v, skipTime, skippingSegments, openNotice, forceAutoSkip, u
         beep.play();
         beep.addEventListener("ended", () => {
             navigator.mediaSession.metadata = null;
-            setTimeout(() =>
-                navigator.mediaSession.metadata = oldMetadata
-            );
+            setTimeout(() => {
+                navigator.mediaSession.metadata = oldMetadata;
+                beep.remove();
+            });
         })
     }
 
@@ -2331,11 +2369,21 @@ function previousChapter(): void {
 function addHotkeyListener(): void {
     document.addEventListener("keydown", hotkeyListener);
 
-    document.addEventListener("DOMContentLoaded", () => {
+    const onLoad = () => {
         // Allow us to stop propagation to YouTube by being deeper
         document.removeEventListener("keydown", hotkeyListener);
         document.body.addEventListener("keydown", hotkeyListener);
-    });
+
+        addCleanupListener(() => {
+            document.body.removeEventListener("keydown", hotkeyListener);
+        });
+    };
+
+    if (document.readyState === "complete") {
+        onLoad();
+    } else {
+        document.addEventListener("DOMContentLoaded", onLoad);
+    }
 }
 
 function hotkeyListener(e: KeyboardEvent): void {
@@ -2392,7 +2440,7 @@ function hotkeyListener(e: KeyboardEvent): void {
  */
 function addCSS() {
     if (!isFirefoxOrSafari() && Config.config.invidiousInstances.includes(new URL(document.URL).hostname)) {
-        window.addEventListener("DOMContentLoaded", () => {
+        const onLoad = () => {
             const head = document.getElementsByTagName("head")[0];
 
             for (const file of utils.css) {
@@ -2404,7 +2452,13 @@ function addCSS() {
 
                 head.appendChild(fileref);
             }
-        });
+        };
+
+        if (document.readyState === "complete") {
+            onLoad();
+        } else {
+            document.addEventListener("DOMContentLoaded", onLoad);
+        }
     }
 }
 
