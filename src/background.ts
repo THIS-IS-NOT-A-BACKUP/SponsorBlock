@@ -27,7 +27,7 @@ const popupPort: Record<string, chrome.runtime.Port> = {};
 const contentScriptRegistrations = {};
 
 // Register content script if needed
-utils.wait(() => Config.config !== null).then(function() {
+utils.wait(() => Config.isReady()).then(function() {
     if (Config.config.supportInvidious) utils.setupExtraSiteContentScripts();
 });
 
@@ -75,7 +75,11 @@ chrome.runtime.onMessage.addListener(function (request, sender, callback) {
         case "infoUpdated":
         case "videoChanged":
             if (sender.tab) {
-                popupPort[sender.tab.id]?.postMessage(request);
+                try {
+                    popupPort[sender.tab.id]?.postMessage(request);
+                } catch (e) {
+                    // This can happen if the popup is closed
+                }
             }
             return false;
         default:
@@ -148,27 +152,65 @@ chrome.runtime.onInstalled.addListener(function () {
  *
  * @param {JSON} options
  */
-function registerFirefoxContentScript(options: Registration) {
-    const oldRegistration = contentScriptRegistrations[options.id];
-    if (oldRegistration) oldRegistration.unregister();
+async function registerFirefoxContentScript(options: Registration) {
+    if ("scripting" in chrome && "getRegisteredContentScripts" in chrome.scripting) {
+        // Bug in Firefox where you need to use browser namespace for this call
+        const getContentScripts = async (filter: browser.scripting.ContentScriptFilter) => {
+            if (isFirefoxOrSafari()) {
+                return await browser.scripting.getRegisteredContentScripts(filter);
+            } else {
+                return await chrome.scripting.getRegisteredContentScripts(filter);
+            }
+        };
 
-    chrome.contentScripts.register({
-        allFrames: options.allFrames,
-        js: options.js,
-        css: options.css,
-        matches: options.matches
-    }).then((registration) => void (contentScriptRegistrations[options.id] = registration));
+        const existingRegistrations = await getContentScripts({
+            ids: [options.id]
+        });
+
+        if (existingRegistrations.length > 0 
+            && existingRegistrations[0].matches.every((match) => options.matches.includes(match))) {
+            // No need to register another script, already registered
+            return;
+        }
+    }
+
+    await unregisterFirefoxContentScript(options.id);
+
+    if ("scripting" in chrome && "getRegisteredContentScripts" in chrome.scripting) {
+        await chrome.scripting.registerContentScripts([{
+            id: options.id,
+            runAt: "document_start",
+            matches: options.matches,
+            allFrames: options.allFrames,
+            js: options.js,
+            css: options.css,
+            persistAcrossSessions: true,
+        }]);
+    } else {
+        chrome.contentScripts.register({
+            allFrames: options.allFrames,
+            js: options.js?.map?.(file => ({file})),
+            css: options.css?.map?.(file => ({file})),
+            matches: options.matches
+        }).then((registration) => void (contentScriptRegistrations[options.id] = registration));
+    }
+
 }
 
 /**
  * Only works on Firefox.
  * Firefox requires that this is handled by the background script
- *
  */
-function unregisterFirefoxContentScript(id: string) {
-    if (contentScriptRegistrations[id]) {
-        contentScriptRegistrations[id].unregister();
-        delete contentScriptRegistrations[id];
+async function  unregisterFirefoxContentScript(id: string) {
+    if ("scripting" in chrome && "getRegisteredContentScripts" in chrome.scripting) {
+        await chrome.scripting.unregisterContentScripts({
+            ids: [id]
+        });
+    } else {
+        if (contentScriptRegistrations[id]) {
+            contentScriptRegistrations[id].unregister();
+            delete contentScriptRegistrations[id];
+        }
     }
 }
 
