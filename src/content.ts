@@ -819,6 +819,8 @@ function incorrectVideoCheck(videoID?: string, sponsorTime?: SponsorTime): boole
     }
 }
 
+let playbackRateCheckInterval: NodeJS.Timeout | null = null;
+let lastPlaybackSpeed = 1;
 let setupVideoListenersFirstTime = true;
 function setupVideoListeners() {
     //wait until it is loaded
@@ -837,6 +839,16 @@ function setupVideoListeners() {
 
         let startedWaiting = false;
         let lastPausedAtZero = true;
+
+        const rateChangeListener = () => {
+            updateVirtualTime();
+            clearWaitingTime();
+
+            startSponsorSchedule();
+        };
+        getVideo().addEventListener('ratechange', rateChangeListener);
+        // Used by videospeed extension (https://github.com/igrigorik/videospeed/pull/740)
+        getVideo().addEventListener('videoSpeed_ratechange', rateChangeListener);
 
         const playListener = () => {
             // If it is not the first event, then the only way to get to 0 is if there is a seek event
@@ -868,7 +880,6 @@ function setupVideoListeners() {
 
                 startSponsorSchedule();
             }
-
         };
         getVideo().addEventListener('play', playListener);
 
@@ -897,6 +908,27 @@ function setupVideoListeners() {
                 lastCheckVideoTime = getVideo().currentTime;
 
                 startSponsorSchedule();
+            }
+
+            if (playbackRateCheckInterval) clearInterval(playbackRateCheckInterval);
+            lastPlaybackSpeed = getVideo().playbackRate;
+
+            // Video speed controller compatibility
+            // That extension makes rate change events not propagate
+            if (document.body.classList.contains("vsc-initialized")) {
+                playbackRateCheckInterval = setInterval(() => {
+                    if ((!getVideoID() || getVideo().paused) && playbackRateCheckInterval) {
+                        // Video is gone, stop checking
+                        clearInterval(playbackRateCheckInterval);
+                        return;
+                    }
+    
+                    if (getVideo().playbackRate !== lastPlaybackSpeed) {
+                        lastPlaybackSpeed = getVideo().playbackRate;
+    
+                        rateChangeListener();
+                    }
+                }, 2000);
             }
         };
         getVideo().addEventListener('playing', playingListener);
@@ -928,20 +960,12 @@ function setupVideoListeners() {
         };
         getVideo().addEventListener('seeking', seekingListener);
         
-        const rateChangeListener = () => {
-            updateVirtualTime();
-            clearWaitingTime();
-
-            startSponsorSchedule();
-        };
-        getVideo().addEventListener('ratechange', () => rateChangeListener);
-        // Used by videospeed extension (https://github.com/igrigorik/videospeed/pull/740)
-        getVideo().addEventListener('videoSpeed_ratechange', rateChangeListener);
-
         const stoppedPlayback = () => {
             // Reset lastCheckVideoTime
             lastCheckVideoTime = -1;
             lastCheckTime = 0;
+
+            if (playbackRateCheckInterval) clearInterval(playbackRateCheckInterval);
 
             lastKnownVideoTime.videoTime = null;
             lastKnownVideoTime.preciseTime = null;
@@ -974,6 +998,8 @@ function setupVideoListeners() {
                 getVideo().removeEventListener('videoSpeed_ratechange', rateChangeListener);
                 getVideo().removeEventListener('pause', pauseListener);
                 getVideo().removeEventListener('waiting', waitingListener);
+
+                if (playbackRateCheckInterval) clearInterval(playbackRateCheckInterval);
             });
         }
     }
