@@ -155,18 +155,9 @@ chrome.runtime.onInstalled.addListener(function () {
  */
 async function registerFirefoxContentScript(options: Registration) {
     if ("scripting" in chrome && "getRegisteredContentScripts" in chrome.scripting) {
-        // Bug in Firefox where you need to use browser namespace for this call
-        const getContentScripts = async (filter: browser.scripting.ContentScriptFilter) => {
-            if (isFirefoxOrSafari()) {
-                return await browser.scripting.getRegisteredContentScripts(filter);
-            } else {
-                return await chrome.scripting.getRegisteredContentScripts(filter);
-            }
-        };
-
-        const existingRegistrations = await getContentScripts({
+        const existingRegistrations = await chromeP.scripting.getRegisteredContentScripts({
             ids: [options.id]
-        });
+        }).catch(() => []);
 
         if (existingRegistrations.length > 0 
             && existingRegistrations[0].matches.every((match) => options.matches.includes(match))) {
@@ -204,9 +195,13 @@ async function registerFirefoxContentScript(options: Registration) {
  */
 async function  unregisterFirefoxContentScript(id: string) {
     if ("scripting" in chrome && "getRegisteredContentScripts" in chrome.scripting) {
-        await chromeP.scripting.unregisterContentScripts({
-            ids: [id]
-        });
+        try {
+            await chromeP.scripting.unregisterContentScripts({
+                ids: [id]
+            });
+        } catch (e) {
+            // Not registered yet
+        }
     } else {
         if (contentScriptRegistrations[id]) {
             contentScriptRegistrations[id].unregister();
