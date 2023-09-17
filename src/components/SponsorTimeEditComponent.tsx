@@ -128,6 +128,12 @@ class SponsorTimeEditComponent extends React.Component<SponsorTimeEditProps, Spo
                     style={timeDisplayStyle}
                     className="sponsorTimeDisplay">
 
+                        <span id={"startButton" + this.idSuffix}
+                            className="sponsorNowButton"
+                            onClick={() => this.setTimeTo(0, 0)}>
+                                {chrome.i18n.getMessage("bracketStart")}
+                        </span>
+
                         <span id={"nowButton0" + this.idSuffix}
                             className="sponsorNowButton"
                             onClick={() => this.setTimeToNow(0)}>
@@ -288,11 +294,10 @@ class SponsorTimeEditComponent extends React.Component<SponsorTimeEditProps, Spo
                     </span>
                 ): ""}
 
-                {(!isNaN(segment[1]) && ![ActionType.Poi, ActionType.Full].includes(sponsorTime.actionType)) 
-                    && sponsorTime.actionType === ActionType.Chapter ? (
+                {(!isNaN(segment[1]) && ![ActionType.Poi, ActionType.Full].includes(sponsorTime.actionType)) ? (
                     <span id={"sponsorTimePreviewButton" + this.idSuffix}
                         className="sponsorTimeEditButton"
-                        onClick={(e) => this.previewTime(e.ctrlKey, e.shiftKey)}>
+                        onClick={(e) => this.previewTime(e.ctrlKey, e.shiftKey, true)}>
                         {chrome.i18n.getMessage("End")}
                     </span>
                 ): ""}
@@ -630,7 +635,7 @@ class SponsorTimeEditComponent extends React.Component<SponsorTimeEditProps, Spo
             : CompileConfig.categorySupport[category]?.[0] ?? ActionType.Skip
     }
 
-    previewTime(ctrlPressed = false, shiftPressed = false): void {
+    previewTime(ctrlPressed = false, shiftPressed = false, skipToEndTime = false): void {
         const sponsorTimes = this.props.contentContainer().sponsorTimesSubmitting;
         const index = this.props.index;
         let seekTime = 2;
@@ -639,13 +644,11 @@ class SponsorTimeEditComponent extends React.Component<SponsorTimeEditProps, Spo
 
         const startTime = sponsorTimes[index].segment[0];
         const endTime = sponsorTimes[index].segment[1];
-        const isChapter = sponsorTimes[index].actionType === ActionType.Chapter;
 
         // If segment starts at 0:00, start playback at the end of the segment
-        const skipToEndTime = startTime === 0 || isChapter;
-        const skipTime = skipToEndTime ? endTime : (startTime - (seekTime * this.props.contentContainer().v.playbackRate));
+        const skipTime = (startTime === 0 || skipToEndTime) ? endTime : (startTime - (seekTime * this.props.contentContainer().v.playbackRate));
 
-        this.props.contentContainer().previewTime(skipTime, !isChapter);
+        this.props.contentContainer().previewTime(skipTime, !skipToEndTime);
     }
 
     inspectTime(): void {

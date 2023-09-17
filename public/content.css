@@ -49,7 +49,13 @@ div:hover > #previewbar.sbNotInvidious {
 }
 
 .previewbar.requiredSegment {
-	transform: scaleY(3)
+	transform: scaleY(3);
+}
+
+.previewbar.selectedSegment {
+	opacity: 1 !important;
+	z-index: 100;
+	transform: scaleY(1.5);
 }
 
 /* Make sure settings are upfront */
@@ -241,11 +247,6 @@ div:hover > .sponsorBlockChapterBar {
 	padding-right: 5px;
 
 	border-collapse: unset;
-}
-
-.sponsorSkipNoticeParent {
-	min-width: 350px;
-	max-width: 50%;
 }
 
 .sponsorSkipNotice {
@@ -570,8 +571,8 @@ div:hover > .sponsorBlockChapterBar {
 .sponsorTimeEditButton {
 	text-decoration: underline;
 
-	margin-left: 20px;
-	margin-right: 20px;
+	margin-left: 13px;
+	margin-right: 13px;
 
 	font-size: 13px;
 
