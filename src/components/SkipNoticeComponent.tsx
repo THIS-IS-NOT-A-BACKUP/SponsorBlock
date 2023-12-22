@@ -14,6 +14,7 @@ import PencilSvg from "../svg-icons/pencil_svg";
 import { downvoteButtonColor, SkipNoticeAction } from "../utils/noticeUtils";
 import { generateUserID } from "../../maze-utils/src/setup";
 import { keybindToString } from "../../maze-utils/src/config";
+import { getFormattedTime } from "../../maze-utils/src/formating";
 
 enum SkipButtonState {
     Undo, // Unskip
@@ -316,6 +317,7 @@ class SkipNoticeComponent extends React.Component<SkipNoticeProps, SkipNoticeSta
                         <select id={"sponsorTimeCategories" + this.idSuffix}
                                 className="sponsorTimeCategories sponsorTimeEditSelector"
                                 defaultValue={this.segments[0].category}
+                                onMouseDown={(e) => e.stopPropagation()}
                                 ref={this.categoryOptionRef}>
 
                             {this.getCategoryOptions()}
@@ -386,8 +388,10 @@ class SkipNoticeComponent extends React.Component<SkipNoticeProps, SkipNoticeSta
                         style={{opacity: this.getSubmissionChooserOpacity(i),
                                 color: this.getSubmissionChooserColor(i)}}
                         onClick={() => this.performAction(i)}
+                        autoFocus={i == 0}
                         key={"submission" + i + this.segments[i].category + this.idSuffix}>
-                    {(i + 1) + ". " + chrome.i18n.getMessage("category_" + this.segments[i].category)}
+                    {`${(i + 1)}. ${chrome.i18n.getMessage("category_" + 
+                        this.segments[i].category)} (${getFormattedTime(this.segments[i].segment[0])})`}
                 </button>
             );
         }
@@ -456,6 +460,15 @@ class SkipNoticeComponent extends React.Component<SkipNoticeProps, SkipNoticeSta
         if (this.segments.length === 1) {
             this.performAction(0, action);
         } else {
+            if (this.state.smaller) {
+                this.setState({
+                    smaller: false
+                });
+
+                this.noticeRef.current.fadedMouseEnter();
+                this.noticeRef.current.resetCountdown();
+            }
+
             switch (action ?? this.state.actionState) {
                 case SkipNoticeAction.None:
                     this.resetStateToStart();
