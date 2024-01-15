@@ -35,7 +35,7 @@ import { openWarningDialog } from "./utils/warnings";
 import { isFirefoxOrSafari, waitFor } from "../maze-utils/src";
 import { getErrorMessage, getFormattedTime } from "../maze-utils/src/formating";
 import { getChannelIDInfo, getVideo, getIsAdPlaying, getIsLivePremiere, setIsAdPlaying, checkVideoIDChange, getVideoID, getYouTubeVideoID, setupVideoModule, checkIfNewVideoID, isOnInvidious, isOnMobileYouTube } from "../maze-utils/src/video";
-import { Keybind, StorageChangesObject, isSafari, keybindEquals } from "../maze-utils/src/config";
+import { Keybind, StorageChangesObject, isSafari, keybindEquals, keybindToString } from "../maze-utils/src/config";
 import { findValidElement } from "../maze-utils/src/dom"
 import { getHash, HashedValue } from "../maze-utils/src/hash";
 import { generateUserID } from "../maze-utils/src/setup";
@@ -47,6 +47,8 @@ import { cleanPage } from "./utils/pageCleaner";
 import { addCleanupListener } from "../maze-utils/src/cleanup";
 import { hideDeArrowPromotion, tryShowingDeArrowPromotion } from "./dearrowPromotion";
 import { asyncRequestToServer } from "./utils/requests";
+import { isMobileControlsOpen } from "./utils/mobileUtils";
+import { defaultPreviewTime } from "./utils/constants";
 
 cleanPage();
 
@@ -76,6 +78,7 @@ let activeSkipKeybindElement: ToggleSkippable = null;
 let retryFetchTimeout: NodeJS.Timeout = null;
 let shownSegmentFailedToFetchWarning = false;
 let selectedSegment: SegmentUUID | null = null;
+let previewedSegment = false;
 
 // JSON video info
 let videoInfo: VideoInfo = null;
@@ -370,6 +373,7 @@ function resetValues() {
     lastCheckTime = 0;
     lastCheckVideoTime = -1;
     retryCount = 0;
+    previewedSegment = false;
 
     sponsorTimes = [];
     existingChaptersImported = false;
@@ -457,16 +461,13 @@ function handleMobileControlsMutations(): void {
     skipButtonControlBar?.updateMobileControls();
 
     if (previewBar !== null) {
-        if (document.body.contains(previewBar.container)) {
-            const progressBarBackground = document.querySelector<HTMLElement>(".progress-bar-background");
-
-            if (progressBarBackground !== null) {
-                updatePreviewBarPositionMobile(progressBarBackground);
-            }
+        if (!previewBar.parent.contains(previewBar.container) && isMobileControlsOpen()) {
+            previewBar.createElement();
+            updatePreviewBar();
 
             return;
-        } else {
-            // The container does not exist anymore, remove that old preview bar
+        } else if (!previewBar.parent.isConnected) {
+            // The parent does not exist anymore, remove that old preview bar
             previewBar.remove();
             previewBar = null;
         }
@@ -483,12 +484,12 @@ function createPreviewBar(): void {
     if (previewBar !== null) return;
 
     const progressElementOptions = [{
-            // For mobile YouTube
-            selector: ".progress-bar-background",
-            isVisibleCheck: true
-        }, {
             // For new mobile YouTube (#1287)
             selector: ".progress-bar-line",
+            isVisibleCheck: true
+        }, {
+            // For newer mobile YouTube (Jan 2024)
+            selector: ".YtProgressBarProgressBarLine",
             isVisibleCheck: true
         }, {
             // For Desktop YouTube
@@ -1314,15 +1315,6 @@ function startSkipScheduleCheckingForStartSponsors() {
     }
 }
 
-/**
- * This function is required on mobile YouTube and will keep getting called whenever the preview bar disapears
- */
-function updatePreviewBarPositionMobile(parent: HTMLElement) {
-    if (document.getElementById("previewbar") === null) {
-        previewBar.createElement(parent);
-    }
-}
-
 function selectSegment(UUID: SegmentUUID): void {
     selectedSegment = UUID;
     updatePreviewBar();
@@ -1589,6 +1581,7 @@ function getStartTimes(sponsorTimes: SponsorTime[], includeIntersectingSegments:
  * @param time
  */
 function previewTime(time: number, unpause = true) {
+    previewedSegment = true;
     getVideo().currentTime = time;
 
     // Unpause the video if needed
@@ -2241,7 +2234,16 @@ function openSubmissionMenu() {
     if (sponsorTimesSubmitting !== undefined && sponsorTimesSubmitting.length > 0) {
         submissionNotice = new SubmissionNotice(skipNoticeContentContainer, sendSubmitMessage);
     }
+}
 
+function previewRecentSegment() {
+    if (sponsorTimesSubmitting !== undefined && sponsorTimesSubmitting.length > 0) {
+        previewTime(sponsorTimesSubmitting[sponsorTimesSubmitting.length - 1].segment[0] - defaultPreviewTime);
+        
+        if (submissionNotice) {
+            submissionNotice.scrollToBottom();
+        }
+    }
 }
 
 function submitSegments() {
@@ -2261,6 +2263,11 @@ async function sendSubmitMessage() {
     // Block if submitting on a running livestream or premiere
     if (!onlyFullVideo && (getIsLivePremiere() || isVisible(document.querySelector(".ytp-live-badge")))) {
         alert(chrome.i18n.getMessage("liveOrPremiere"));
+        return;
+    }
+
+    if (!previewedSegment) {
+        alert(`${chrome.i18n.getMessage("previewSegmentRequired")} ${keybindToString(Config.config.previewKeybind)}`);
         return;
     }
 
@@ -2373,16 +2380,10 @@ function getSegmentsMessage(sponsorTimes: SponsorTime[]): string {
 }
 
 function updateActiveSegment(currentTime: number): void {
-    const activeSegments = previewBar?.updateChapterText(sponsorTimes, sponsorTimesSubmitting, currentTime);
     chrome.runtime.sendMessage({
         message: "time",
         time: currentTime
     });
-
-    const chapterSegments = activeSegments?.filter((segment) => segment.actionType === ActionType.Chapter);
-    if (chapterSegments?.length > 0) {
-        sendTelemetryAndCount(chapterSegments, 0, true);
-    }
 }
 
 function nextChapter(): void {
@@ -2461,6 +2462,7 @@ function hotkeyListener(e: KeyboardEvent): void {
     const closeSkipNoticeKey = Config.config.closeSkipNoticeKeybind;
     const startSponsorKey = Config.config.startSponsorKeybind;
     const submitKey = Config.config.actuallySubmitKeybind;
+    const previewKey = Config.config.previewKeybind;
     const openSubmissionMenuKey = Config.config.submitKeybind;
     const nextChapterKey = Config.config.nextChapterKeybind;
     const previousChapterKey = Config.config.previousChapterKeybind;
@@ -2491,6 +2493,9 @@ function hotkeyListener(e: KeyboardEvent): void {
         return;
     } else if (keybindEquals(key, openSubmissionMenuKey)) {
         openSubmissionMenu();
+        return;
+    } else if (keybindEquals(key, previewKey)) {
+        previewRecentSegment();
         return;
     } else if (keybindEquals(key, nextChapterKey)) {
         if (sponsorTimes.length > 0) e.stopPropagation();
