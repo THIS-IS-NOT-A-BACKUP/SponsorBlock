@@ -1608,6 +1608,9 @@ function sendTelemetryAndCount(skippingSegments: SponsorTime[], secondsSkipped: 
             }
 
             if (fullSkip) asyncRequestToServer("POST", "/api/viewedVideoSponsorTime?UUID=" + segment.UUID);
+        } else if (!previewedSegment && sponsorTimesSubmitting.some((s) => s.segment === segment.segment)) {
+            // Count that as a previewed segment
+            previewedSegment = true;
         }
     }
 }
@@ -1983,6 +1986,9 @@ function updateSponsorTimesSubmitting(getFromConfig = true) {
         }
 
         if (sponsorTimesSubmitting.length > 0) {
+            // Assume they already previewed a segment
+            previewedSegment = true;
+
             importExistingChapters(true);
         }
     }
@@ -2268,7 +2274,8 @@ async function sendSubmitMessage() {
 
     if (!previewedSegment 
             && !sponsorTimesSubmitting.every((segment) => 
-                [ActionType.Full, ActionType.Chapter, ActionType.Poi].includes(segment.actionType))) {
+                [ActionType.Full, ActionType.Chapter, ActionType.Poi].includes(segment.actionType) 
+                    || segment.segment[1] >= getVideo()?.duration)) {
         alert(`${chrome.i18n.getMessage("previewSegmentRequired")} ${keybindToString(Config.config.previewKeybind)}`);
         return;
     }
