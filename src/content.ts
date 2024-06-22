@@ -127,7 +127,7 @@ setupVideoModule({
         updateVisibilityOfPlayerControlsButton();
     },
     resetValues,
-    documentScript
+    documentScript: chrome.runtime.getManifest().manifest_version === 2 ? documentScript : undefined
 }, () => Config);
 setupThumbnailListener();
 
@@ -177,7 +177,6 @@ const skipNoticeContentContainer: ContentContainer = () => ({
     sponsorTimes,
     sponsorTimesSubmitting,
     skipNotices,
-    v: getVideo(),
     sponsorVideoID: getVideoID(),
     reskipSponsorTime,
     updatePreviewBar,
