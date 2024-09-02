@@ -50,6 +50,7 @@ import { asyncRequestToServer } from "./utils/requests";
 import { isMobileControlsOpen } from "./utils/mobileUtils";
 import { defaultPreviewTime } from "./utils/constants";
 import { onVideoPage } from "../maze-utils/src/pageInfo";
+import { getSegmentsForVideo } from "./utils/segmentData";
 
 cleanPage();
 
@@ -267,7 +268,7 @@ function messageListener(request: Message, sender: unknown, sendResponse: (respo
             sendResponse({ hasVideo: getVideoID() != null });
             // fetch segments
             if (getVideoID()) {
-                sponsorsLookup(false);
+                sponsorsLookup(false, true);
             }
 
             break;
@@ -362,7 +363,7 @@ function contentConfigUpdateListener(changes: StorageChangesObject) {
                 updateVisibilityOfPlayerControlsButton()
                 break;
             case "categorySelections":
-                sponsorsLookup();
+                sponsorsLookup(true, true);
                 break;
             case "barTypes":
                 setCategoryColorCSSVariables();
@@ -1131,38 +1132,20 @@ function setupCategoryPill() {
     categoryPill.attachToPage(isOnMobileYouTube(), isOnInvidious(), voteAsync);
 }
 
-async function sponsorsLookup(keepOldSubmissions = true) {
-    const categories: string[] = Config.config.categorySelections.map((category) => category.name);
-
-    const extraRequestData: Record<string, unknown> = {};
-    const hashParams = getHashParams();
-    if (hashParams.requiredSegment) extraRequestData.requiredSegment = hashParams.requiredSegment;
-
+async function sponsorsLookup(keepOldSubmissions = true, ignoreCache = false) {
     const videoID = getVideoID()
     if (!videoID) {
         console.error("[SponsorBlock] Attempted to fetch segments with a null/undefined videoID.");
         return;
     }
-    const hashPrefix = (await getHash(videoID, 1)).slice(0, 4) as VideoID & HashedValue;
-    const response = await asyncRequestToServer('GET', "/api/skipSegments/" + hashPrefix, {
-        categories,
-        actionTypes: getEnabledActionTypes(),
-        userAgent: `${chrome.runtime.id}`,
-        ...extraRequestData
-    });
+
+    const segmentData = await getSegmentsForVideo(videoID, ignoreCache);
 
     // store last response status
-    lastResponseStatus = response?.status;
+    lastResponseStatus = segmentData.status;
+    if (segmentData.status === 200) {
+        const receivedSegments = segmentData.segments;
 
-    if (response?.ok) {
-        const receivedSegments: SponsorTime[] = JSON.parse(response.responseText)
-                    ?.filter((video) => video.videoID === getVideoID())
-                    ?.map((video) => video.segments)?.[0]
-                    ?.map((segment) => ({
-                        ...segment,
-                        source: SponsorSourceType.Server
-                    }))
-                    ?.sort((a, b) => a.segment[0] - b.segment[0]);
         if (receivedSegments && receivedSegments.length) {
             sponsorDataFound = true;
 
@@ -1202,6 +1185,7 @@ async function sponsorsLookup(keepOldSubmissions = true) {
             }
 
             // See if some segments should be hidden
+            const hashPrefix = (await getHash(videoID, 1)).slice(0, 4) as VideoID & HashedValue;
             const downvotedData = Config.local.downvotedSegments[hashPrefix];
             if (downvotedData) {
                 for (const segment of sponsorTimes) {
@@ -1272,18 +1256,6 @@ function importExistingChapters(wait: boolean) {
                 }).catch(() => { importingChaptersWaiting = false; triedImportingChapters = true; }); // eslint-disable-line @typescript-eslint/no-empty-function
         }
     }
-}
-
-function getEnabledActionTypes(forceFullVideo = false): ActionType[] {
-    const actionTypes = [ActionType.Skip, ActionType.Poi, ActionType.Chapter];
-    if (Config.config.muteSegments) {
-        actionTypes.push(ActionType.Mute);
-    }
-    if (Config.config.fullVideoSegments || forceFullVideo) {
-        actionTypes.push(ActionType.Full);
-    }
-
-    return actionTypes;
 }
 
 async function lockedCategoriesLookup(): Promise<void> {
@@ -2010,7 +1982,7 @@ function startOrEndTimingNewSegment() {
     Config.forceLocalUpdate("unsubmittedSegments");
 
     // Make sure they know if someone has already submitted something it while they were watching
-    sponsorsLookup();
+    sponsorsLookup(true, true);
 
     updateEditButtonsOnPlayer();
     updateSponsorTimesSubmitting(false);
