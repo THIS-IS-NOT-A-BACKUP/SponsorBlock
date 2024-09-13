@@ -2571,6 +2571,8 @@ function hotkeyListener(e: KeyboardEvent): void {
         submitSegments();
         return;
     } else if (keybindEquals(key, openSubmissionMenuKey)) {
+        e.preventDefault();
+
         openSubmissionMenu();
         return;
     } else if (keybindEquals(key, previewKey)) {
@@ -2584,16 +2586,6 @@ function hotkeyListener(e: KeyboardEvent): void {
         if (sponsorTimes.length > 0) e.stopPropagation();
         previousChapter();
         return;
-    }
-
-    //legacy - to preserve keybinds for skipKey, startSponsorKey and submitKey for people who set it before the update. (shouldn't be changed for future keybind options)
-    if (key.key == skipKey?.key && skipKey.code == null && !keybindEquals(Config.syncDefaults.skipKeybind, skipKey)) {
-        if (activeSkipKeybindElement)
-            activeSkipKeybindElement.toggleSkip.call(activeSkipKeybindElement);
-    } else if (key.key == startSponsorKey?.key && startSponsorKey.code == null && !keybindEquals(Config.syncDefaults.startSponsorKeybind, startSponsorKey)) {
-        startOrEndTimingNewSegment();
-    } else if (key.key == submitKey?.key && submitKey.code == null && !keybindEquals(Config.syncDefaults.submitKeybind, submitKey)) {
-        openSubmissionMenu();
     }
 }
 
