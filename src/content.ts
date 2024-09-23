@@ -75,7 +75,6 @@ let sponsorTimes: SponsorTime[] = [];
 let existingChaptersImported = false;
 let importingChaptersWaitingForFocus = false;
 let importingChaptersWaiting = false;
-let triedImportingChapters = false;
 // List of open skip notices
 const skipNotices: SkipNotice[] = [];
 let activeSkipKeybindElement: ToggleSkippable = null;
@@ -395,7 +394,6 @@ function resetValues() {
 
     sponsorTimes = [];
     existingChaptersImported = false;
-    triedImportingChapters = false;
     sponsorSkipped = [];
     lastResponseStatus = 0;
     shownSegmentFailedToFetchWarning = false;
@@ -512,12 +510,8 @@ function handleMobileControlsMutations(): void {
 
 function getPreviewBarAttachElement(): HTMLElement | null {
     const progressElementOptions = [{
-            // For new mobile YouTube (#1287)
-            selector: ".progress-bar-line",
-            isVisibleCheck: true
-        }, {
-            // For newer mobile YouTube (Jan 2024)
-            selector: ".YtProgressBarProgressBarLine",
+            // For newer mobile YouTube (Sept 2024)
+            selector: ".YtChapteredProgressBarHost",
             isVisibleCheck: true
         }, {
             // For newer mobile YouTube (May 2024)
@@ -1139,13 +1133,16 @@ function setupCategoryPill() {
 }
 
 async function sponsorsLookup(keepOldSubmissions = true, ignoreCache = false) {
-    const videoID = getVideoID()
+    const videoID = getVideoID();
     if (!videoID) {
         console.error("[SponsorBlock] Attempted to fetch segments with a null/undefined videoID.");
         return;
     }
 
     const segmentData = await getSegmentsForVideo(videoID, ignoreCache);
+
+    // Make sure an old pending request doesn't get used.
+    if (videoID !== getVideoID()) return;
 
     // store last response status
     lastResponseStatus = segmentData.status;
@@ -1238,7 +1235,7 @@ async function sponsorsLookup(keepOldSubmissions = true, ignoreCache = false) {
 }
 
 function importExistingChapters(wait: boolean) {
-    if (!existingChaptersImported && !importingChaptersWaiting && !triedImportingChapters && onVideoPage() && !isOnMobileYouTube()) {
+    if (!existingChaptersImported && !importingChaptersWaiting && onVideoPage() && !isOnMobileYouTube()) {
         const waitCondition = () => getVideoDuration() && getExistingChapters(getVideoID(), getVideoDuration());
 
         if (wait && !document.hasFocus() && !importingChaptersWaitingForFocus && !waitCondition()) {
@@ -1259,7 +1256,7 @@ function importExistingChapters(wait: boolean) {
                         existingChaptersImported = true;
                         updatePreviewBar();
                     }
-                }).catch(() => { importingChaptersWaiting = false; triedImportingChapters = true; }); // eslint-disable-line @typescript-eslint/no-empty-function
+                }).catch(() => { importingChaptersWaiting = false; }); // eslint-disable-line @typescript-eslint/no-empty-function
         }
     }
 }
