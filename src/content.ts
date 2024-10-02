@@ -511,7 +511,7 @@ function handleMobileControlsMutations(): void {
 function getPreviewBarAttachElement(): HTMLElement | null {
     const progressElementOptions = [{
             // For newer mobile YouTube (Sept 2024)
-            selector: ".YtChapteredProgressBarHost",
+            selector: ".YtProgressBarLineHost, .YtChapteredProgressBarHost",
             isVisibleCheck: true
         }, {
             // For newer mobile YouTube (May 2024)
@@ -2634,11 +2634,11 @@ function showTimeWithoutSkips(skippedDuration: number): void {
     }
 
     // YouTube player time display
-    const displayClass =
-        isOnInvidious()     ? "vjs-duration" :
-        isOnMobileYouTube() ? "ytm-time-display" :
-                              "ytp-time-display.notranslate";
-    const display = document.querySelector(`.${displayClass}`);
+    const selector =
+        isOnInvidious()     ? ".vjs-duration" :
+        isOnMobileYouTube() ? ".YtwPlayerTimeDisplayContent" :
+                              ".ytp-time-display.notranslate .ytp-time-wrapper";
+    const display = document.querySelector(selector);
     if (!display) return;
 
     const durationID = "sponsorBlockDurationAfterSkips";
@@ -2648,9 +2648,13 @@ function showTimeWithoutSkips(skippedDuration: number): void {
     if (duration === null) {
         duration = document.createElement('span');
         duration.id = durationID;
-        if (!isOnInvidious()) duration.classList.add(displayClass);
 
-        display.appendChild(duration);
+        if (isOnMobileYouTube()) {
+            duration.style.paddingLeft = "4px";
+            display.insertBefore(duration, display.lastChild);
+        } else {
+            display.appendChild(duration);
+        }
     }
 
     const durationAfterSkips = getFormattedTime(getVideoDuration() - skippedDuration);
