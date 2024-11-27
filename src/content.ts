@@ -804,7 +804,9 @@ async function startSponsorSchedule(includeIntersectingSegments = false, current
             currentSkipSchedule = setTimeout(skippingFunction, offsetDelayTime);
 
             // Show the notice only if the segment hasn't already started
-            if (Config.config.showUpcomingNotice && getCurrentTime() < skippingSegments[0].segment[0]) {
+            if (Config.config.showUpcomingNotice && getCurrentTime() < skippingSegments[0].segment[0] 
+                    && !sponsorTimesSubmitting?.some((segment) => segment.segment === currentSkip.segment)
+                    && [ActionType.Skip, ActionType.Mute].includes(skippingSegments[0].actionType)) {
                 const maxPopupTime = 3000;
                 const timeUntilPopup = Math.max(0, offsetDelayTime - maxPopupTime);
                 const popupTime = Math.min(maxPopupTime, timeUntilPopup);
@@ -877,8 +879,7 @@ function incorrectVideoCheck(videoID?: string, sponsorTime?: SponsorTime): boole
 let playbackRateCheckInterval: NodeJS.Timeout | null = null;
 let lastPlaybackSpeed = 1;
 let setupVideoListenersFirstTime = true;
-function setupVideoListeners() {
-    const video = getVideo();
+function setupVideoListeners(video: HTMLVideoElement) {
     if (!video) return; // Maybe video became invisible
 
     //wait until it is loaded
@@ -1460,10 +1461,10 @@ async function channelIDChange(channelIDInfo: ChannelIDInfo) {
     if (Config.config.forceChannelCheck && sponsorTimes?.length > 0) startSkipScheduleCheckingForStartSponsors();
 }
 
-function videoElementChange(newVideo: boolean): void {
+function videoElementChange(newVideo: boolean, video: HTMLVideoElement): void {
     waitFor(() => Config.isReady()).then(() => {
         if (newVideo) {
-            setupVideoListeners();
+            setupVideoListeners(video);
             setupSkipButtonControlBar();
             setupCategoryPill();
         }
