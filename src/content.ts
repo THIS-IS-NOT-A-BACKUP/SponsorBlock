@@ -35,7 +35,7 @@ import { ChapterVote } from "./render/ChapterVote";
 import { openWarningDialog } from "./utils/warnings";
 import { isFirefoxOrSafari, waitFor } from "../maze-utils/src";
 import { getErrorMessage, getFormattedTime } from "../maze-utils/src/formating";
-import { getChannelIDInfo, getVideo, getIsAdPlaying, getIsLivePremiere, setIsAdPlaying, checkVideoIDChange, getVideoID, getYouTubeVideoID, setupVideoModule, checkIfNewVideoID, isOnInvidious, isOnMobileYouTube, getLastNonInlineVideoID, triggerVideoIDChange, triggerVideoElementChange, getIsInline, getCurrentTime, setCurrentTime, getVideoDuration, verifyCurrentTime } from "../maze-utils/src/video";
+import { getChannelIDInfo, getVideo, getIsAdPlaying, getIsLivePremiere, setIsAdPlaying, checkVideoIDChange, getVideoID, getYouTubeVideoID, setupVideoModule, checkIfNewVideoID, isOnInvidious, isOnMobileYouTube, getLastNonInlineVideoID, triggerVideoIDChange, triggerVideoElementChange, getIsInline, getCurrentTime, setCurrentTime, getVideoDuration, verifyCurrentTime, waitForVideo } from "../maze-utils/src/video";
 import { Keybind, StorageChangesObject, isSafari, keybindEquals, keybindToString } from "../maze-utils/src/config";
 import { findValidElement } from "../maze-utils/src/dom"
 import { getHash, HashedValue } from "../maze-utils/src/hash";
@@ -806,16 +806,15 @@ async function startSponsorSchedule(includeIntersectingSegments = false, current
             // Show the notice only if the segment hasn't already started
             if (Config.config.showUpcomingNotice && getCurrentTime() < skippingSegments[0].segment[0] 
                     && !sponsorTimesSubmitting?.some((segment) => segment.segment === currentSkip.segment)
-                    && [ActionType.Skip, ActionType.Mute].includes(skippingSegments[0].actionType)) {
+                    && [ActionType.Skip, ActionType.Mute].includes(skippingSegments[0].actionType)
+                    && !getVideo()?.paused) {
                 const maxPopupTime = 3000;
                 const timeUntilPopup = Math.max(0, offsetDelayTime - maxPopupTime);
-                const popupTime = Math.min(maxPopupTime, timeUntilPopup);
+                const popupTime = offsetDelayTime - timeUntilPopup;
                 const autoSkip = shouldAutoSkip(skippingSegments[0]);
 
-                if (timeUntilPopup > 0) {
-                    if (currentUpcomingSchedule) clearTimeout(currentUpcomingSchedule);
-                    currentUpcomingSchedule = setTimeout(createUpcomingNotice, timeUntilPopup, skippingSegments, popupTime, autoSkip);
-                }
+                if (currentUpcomingSchedule) clearTimeout(currentUpcomingSchedule);
+                currentUpcomingSchedule = setTimeout(createUpcomingNotice, timeUntilPopup, [skippingSegments[0]], popupTime, autoSkip);
             }
         }
     }
@@ -833,7 +832,7 @@ function waitForNextTimeChange(): Promise<DOMHighResTimeStamp | null> {
 
 function getVirtualTime(): number {
     const virtualTime = lastTimeFromWaitingEvent ?? (lastKnownVideoTime.videoTime !== null ?
-        (performance.now() - lastKnownVideoTime.preciseTime) * getVideo().playbackRate / 1000 + lastKnownVideoTime.videoTime : null);
+        (performance.now() - lastKnownVideoTime.preciseTime) * (getVideo()?.playbackRate || 1) / 1000 + lastKnownVideoTime.videoTime : null);
 
     if (Config.config.useVirtualTime && !isSafari() && virtualTime
             && Math.abs(virtualTime - getCurrentTime()) < 0.2 && getCurrentTime() !== 0) {
@@ -1231,7 +1230,7 @@ async function sponsorsLookup(keepOldSubmissions = true, ignoreCache = false) {
 
             if (!getVideo()) {
                 //there is still no video here
-                await waitFor(() => getVideo(), 5000, 10);
+                await waitForVideo();
             }
 
             startSkipScheduleCheckingForStartSponsors();
@@ -1376,7 +1375,9 @@ function startSkipScheduleCheckingForStartSponsors() {
 
         const fullVideoSegment = sponsorTimes.filter((time) => time.actionType === ActionType.Full)[0];
         if (fullVideoSegment) {
-            categoryPill?.setSegment(fullVideoSegment);
+            waitFor(() => categoryPill).then(() => {
+                categoryPill?.setSegment(fullVideoSegment);
+            });
         }
 
         if (startingSegmentTime !== -1) {
@@ -1765,11 +1766,13 @@ function skipToTime({v, skipTime, skippingSegments, openNotice, forceAutoSkip, u
     if (!autoSkip
             && skippingSegments.length === 1
             && skippingSegments[0].actionType === ActionType.Poi) {
-        skipButtonControlBar.enable(skippingSegments[0]);
-        if (isOnMobileYouTube() || Config.config.skipKeybind == null) skipButtonControlBar.setShowKeybindHint(false);
-
-        activeSkipKeybindElement?.setShowKeybindHint(false);
-        activeSkipKeybindElement = skipButtonControlBar;
+        waitFor(() => skipButtonControlBar).then(() => {
+            skipButtonControlBar.enable(skippingSegments[0]);
+            if (isOnMobileYouTube() || Config.config.skipKeybind == null) skipButtonControlBar.setShowKeybindHint(false);
+    
+            activeSkipKeybindElement?.setShowKeybindHint(false);
+            activeSkipKeybindElement = skipButtonControlBar;
+        })
     } else {
         if (openNotice) {
             //send out the message saying that a sponsor message was skipped
@@ -1823,7 +1826,7 @@ function createUpcomingNotice(skippingSegments: SponsorTime[], timeLeft: number,
     }
 
     upcomingNotice?.close();
-    upcomingNotice = new UpcomingNotice(skippingSegments, skipNoticeContentContainer, timeLeft, autoSkip);
+    upcomingNotice = new UpcomingNotice(skippingSegments, skipNoticeContentContainer, timeLeft / 1000, autoSkip);
 }
 
 function unskipSponsorTime(segment: SponsorTime, unskipTime: number = null, forceSeek = false) {
