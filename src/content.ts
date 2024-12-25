@@ -80,7 +80,6 @@ let importingChaptersWaiting = false;
 const skipNotices: SkipNotice[] = [];
 let upcomingNotice: UpcomingNotice | null = null;
 let activeSkipKeybindElement: ToggleSkippable = null;
-let retryFetchTimeout: NodeJS.Timeout = null;
 let shownSegmentFailedToFetchWarning = false;
 let selectedSegment: SegmentUUID | null = null;
 let previewedSegment = false;
@@ -173,7 +172,6 @@ let popupInitialised = false;
 let submissionNotice: SubmissionNotice = null;
 
 let lastResponseStatus: number;
-let retryCount = 0;
 
 // Contains all of the functions and variables needed by the skip notice
 const skipNoticeContentContainer: ContentContainer = () => ({
@@ -391,7 +389,6 @@ if (!Config.configSyncListeners.includes(contentConfigUpdateListener)) {
 function resetValues() {
     lastCheckTime = 0;
     lastCheckVideoTime = -1;
-    retryCount = 0;
     previewedSegment = false;
     firstPlay = true;
 
@@ -1241,11 +1238,7 @@ async function sponsorsLookup(keepOldSubmissions = true, ignoreCache = false) {
             if (!isNaN(getVideoDuration())) {
                 updatePreviewBar();
             }
-        } else {
-            retryFetch(404);
         }
-    } else {
-        retryFetch(lastResponseStatus);
     }
 
     importExistingChapters(true);
@@ -1310,27 +1303,6 @@ async function lockedCategoriesLookup(): Promise<void> {
             }
         } catch (e) { } //eslint-disable-line no-empty
     }
-}
-
-function retryFetch(errorCode: number): void {
-    sponsorDataFound = false;
-    if (!Config.config.refetchWhenNotFound) return;
-
-    if (retryFetchTimeout) clearTimeout(retryFetchTimeout);
-    if ((errorCode !== 404 && retryCount > 1) || (errorCode !== 404 && retryCount > 10)) {
-        // Too many errors (50x), give up
-        return;
-    }
-
-    retryCount++;
-
-    const delay = errorCode === 404 ? (30000 + Math.random() * 30000) : (2000 + Math.random() * 10000);
-    retryFetchTimeout = setTimeout(() => {
-        if (getVideoID() && sponsorTimes?.length === 0
-                || sponsorTimes.every((segment) => segment.source !== SponsorSourceType.Server)) {
-            // sponsorsLookup();
-        }
-    }, delay);
 }
 
 /**
