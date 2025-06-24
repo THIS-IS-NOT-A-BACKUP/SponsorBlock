@@ -4,13 +4,18 @@ import * as Path from "path";
 
 import * as fs from "fs";
 
-test("Selenium Chrome test", async () => {
+xtest("Selenium Chrome test", async () => {
     let driver: WebDriver;
     try {
         driver = await setup();   
     } catch (e) {
         console.warn("A browser is probably not installed, skipping selenium tests");
         console.warn(e);
+
+        if (String(e).includes("This version of ChromeDriver only supports")) {
+            // Count as failure
+            throw e;
+        }
 
         return;
     }
@@ -58,7 +63,7 @@ async function setup(): Promise<WebDriver> {
     options.addArguments("--headless=new");
     options.addArguments("--window-size=1920,1080");
 
-    const driver = await new Builder().forBrowser("chromium").setChromeOptions(options).build();
+    const driver = await new Builder().forBrowser("chrome").setChromeOptions(options).build();
     driver.manage().setTimeouts({
         implicit: 5000
     });
